@@ -1,0 +1,29 @@
+package com.settlements.registry;
+
+import com.settlements.SettlementsMod;
+import com.settlements.world.menu.ShopManagementMenu;
+import com.settlements.world.menu.ShopMenu;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraftforge.common.extensions.IForgeMenuType;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.registries.RegistryObject;
+
+public final class ModMenuTypes {
+    public static final DeferredRegister<MenuType<?>> MENU_TYPES =
+            DeferredRegister.create(ForgeRegistries.MENU_TYPES, SettlementsMod.MOD_ID);
+
+    public static final RegistryObject<MenuType<ShopMenu>> SHOP_MENU =
+            MENU_TYPES.register("shop_menu", () -> IForgeMenuType.create(ShopMenu::new));
+
+    public static final RegistryObject<MenuType<ShopManagementMenu>> SHOP_MANAGEMENT_MENU =
+            MENU_TYPES.register("shop_management_menu", () -> IForgeMenuType.create(ShopManagementMenu::new));
+
+    private ModMenuTypes() {
+    }
+
+    public static void register(IEventBus eventBus) {
+        MENU_TYPES.register(eventBus);
+    }
+}
