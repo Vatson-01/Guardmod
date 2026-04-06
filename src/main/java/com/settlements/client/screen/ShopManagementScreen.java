@@ -77,7 +77,7 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
 
     public ShopManagementScreen(ShopManagementMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        this.imageWidth = 468;
+        this.imageWidth = 494;
         this.imageHeight = 310;
         this.inventoryLabelY = 218;
     }
@@ -90,11 +90,11 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         int top = this.topPos;
 
         tabMainButton = addRenderableWidget(Button.builder(Component.literal("Основное"), b -> activeTab = TAB_MAIN)
-                .bounds(left + 184, top + 84, 86, 20)
+                .bounds(left + 184, top + 84, 96, 20)
                 .build());
 
         tabDynamicButton = addRenderableWidget(Button.builder(Component.literal("Динамика"), b -> activeTab = TAB_DYNAMIC)
-                .bounds(left + 274, top + 84, 86, 20)
+                .bounds(left + 284, top + 84, 96, 20)
                 .build());
 
         toggleEnabledButton = addRenderableWidget(Button.builder(Component.literal("Магазин"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_ENABLED))
@@ -146,136 +146,143 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
                 .build());
 
         infiniteStockButton = addRenderableWidget(Button.builder(Component.literal("∞ Склад"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_INFINITE_STOCK))
-                .bounds(left + 360, top + 12, 100, 20)
+                .bounds(left + 388, top + 12, 96, 20)
                 .build());
 
         infiniteBalanceButton = addRenderableWidget(Button.builder(Component.literal("∞ Баланс"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_INFINITE_BALANCE))
-                .bounds(left + 360, top + 36, 100, 20)
+                .bounds(left + 388, top + 36, 96, 20)
                 .build());
 
         indestructibleButton = addRenderableWidget(Button.builder(Component.literal("Неразр."), b -> press(ShopManagementMenu.BUTTON_TOGGLE_INDESTRUCTIBLE))
-                .bounds(left + 360, top + 60, 100, 20)
-                .build());
-
-        addSellTradeButton = addRenderableWidget(Button.builder(Component.literal("Продать"), b -> press(ShopManagementMenu.BUTTON_ADD_SELL_TRADE))
-                .bounds(left + 184, top + 112, 84, 20)
-                .build());
-
-        addBuyTradeButton = addRenderableWidget(Button.builder(Component.literal("Скупать"), b -> press(ShopManagementMenu.BUTTON_ADD_BUY_TRADE))
-                .bounds(left + 272, top + 112, 84, 20)
-                .build());
-
-        addDualTradeButton = addRenderableWidget(Button.builder(Component.literal("Обе"), b -> press(ShopManagementMenu.BUTTON_ADD_DUAL_TRADE))
-                .bounds(left + 360, top + 112, 100, 20)
-                .build());
-
-        removeTradeButton = addRenderableWidget(Button.builder(Component.literal("Удалить"), b -> press(ShopManagementMenu.BUTTON_REMOVE_TRADE))
-                .bounds(left + 184, top + 136, 134, 20)
-                .build());
-
-        toggleTradeEnabledButton = addRenderableWidget(Button.builder(Component.literal("Сделка"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_TRADE_ENABLED))
-                .bounds(left + 326, top + 136, 134, 20)
+                .bounds(left + 388, top + 60, 96, 20)
                 .build());
 
         toggleTradeModeButton = addRenderableWidget(Button.builder(Component.literal("Режим"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_TRADE_MODE))
-                .bounds(left + 326, top + 112, 134, 20)
+                .bounds(left + 388, top + 84, 96, 20)
+                .build());
+
+        addSellTradeButton = addRenderableWidget(Button.builder(Component.literal("Продать"), b -> press(ShopManagementMenu.BUTTON_ADD_SELL_TRADE))
+                .bounds(left + 184, top + 112, 92, 20)
+                .build());
+
+        addBuyTradeButton = addRenderableWidget(Button.builder(Component.literal("Скупать"), b -> press(ShopManagementMenu.BUTTON_ADD_BUY_TRADE))
+                .bounds(left + 280, top + 112, 92, 20)
+                .build());
+
+        addDualTradeButton = addRenderableWidget(Button.builder(Component.literal("Обе"), b -> press(ShopManagementMenu.BUTTON_ADD_DUAL_TRADE))
+                .bounds(left + 376, top + 112, 108, 20)
+                .build());
+
+        removeTradeButton = addRenderableWidget(Button.builder(Component.literal("Удалить"), b -> press(ShopManagementMenu.BUTTON_REMOVE_TRADE))
+                .bounds(left + 184, top + 136, 146, 20)
+                .build());
+
+        toggleTradeEnabledButton = addRenderableWidget(Button.builder(Component.literal("Сделка"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_TRADE_ENABLED))
+                .bounds(left + 334, top + 136, 150, 20)
                 .build());
 
         sellPriceMinus1Button = addRenderableWidget(Button.builder(Component.literal("-1"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_MINUS_1))
-                .bounds(left + 346, top + 156, 26, 20)
+                .bounds(left + 376, top + 184, 24, 20)
                 .build());
 
         sellPricePlus1Button = addRenderableWidget(Button.builder(Component.literal("+1"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_PLUS_1))
-                .bounds(left + 374, top + 156, 26, 20)
+                .bounds(left + 402, top + 184, 24, 20)
                 .build());
 
         sellPriceMinus10Button = addRenderableWidget(Button.builder(Component.literal("-10"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_MINUS_10))
-                .bounds(left + 402, top + 156, 28, 20)
+                .bounds(left + 428, top + 184, 28, 20)
                 .build());
 
         sellPricePlus10Button = addRenderableWidget(Button.builder(Component.literal("+10"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_PLUS_10))
-                .bounds(left + 432, top + 156, 28, 20)
+                .bounds(left + 458, top + 184, 26, 20)
                 .build());
 
         buyPriceMinus1Button = addRenderableWidget(Button.builder(Component.literal("-1"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_MINUS_1))
-                .bounds(left + 346, top + 172, 26, 20)
+                .bounds(left + 376, top + 206, 24, 20)
                 .build());
 
         buyPricePlus1Button = addRenderableWidget(Button.builder(Component.literal("+1"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_PLUS_1))
-                .bounds(left + 374, top + 172, 26, 20)
+                .bounds(left + 402, top + 206, 24, 20)
                 .build());
 
         buyPriceMinus10Button = addRenderableWidget(Button.builder(Component.literal("-10"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_MINUS_10))
-                .bounds(left + 402, top + 172, 28, 20)
+                .bounds(left + 428, top + 206, 28, 20)
                 .build());
 
         buyPricePlus10Button = addRenderableWidget(Button.builder(Component.literal("+10"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_PLUS_10))
-                .bounds(left + 432, top + 172, 28, 20)
+                .bounds(left + 458, top + 206, 26, 20)
                 .build());
 
         sellBatchMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_SELL_BATCH_MINUS_1))
-                .bounds(left + 404, top + 188, 26, 20)
+                .bounds(left + 430, top + 228, 24, 20)
                 .build());
 
         sellBatchPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_SELL_BATCH_PLUS_1))
-                .bounds(left + 432, top + 188, 28, 20)
+                .bounds(left + 458, top + 228, 26, 20)
                 .build());
 
         buyBatchMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_BUY_BATCH_MINUS_1))
-                .bounds(left + 404, top + 204, 26, 20)
+                .bounds(left + 430, top + 250, 24, 20)
                 .build());
 
         buyBatchPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_BUY_BATCH_PLUS_1))
-                .bounds(left + 432, top + 204, 28, 20)
+                .bounds(left + 458, top + 250, 26, 20)
                 .build());
 
         dynamicMinSellMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MIN_SELL_MINUS_1))
-                .bounds(left + 286, top + 124, 18, 18)
+                .bounds(left + 292, top + 130, 18, 18)
                 .build());
         dynamicMinSellPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MIN_SELL_PLUS_1))
-                .bounds(left + 308, top + 124, 18, 18)
+                .bounds(left + 314, top + 130, 18, 18)
                 .build());
+
         dynamicMaxSellMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MAX_SELL_MINUS_1))
-                .bounds(left + 286, top + 140, 18, 18)
+                .bounds(left + 292, top + 152, 18, 18)
                 .build());
         dynamicMaxSellPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MAX_SELL_PLUS_1))
-                .bounds(left + 308, top + 140, 18, 18)
+                .bounds(left + 314, top + 152, 18, 18)
                 .build());
+
         dynamicMinBuyMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MIN_BUY_MINUS_1))
-                .bounds(left + 286, top + 156, 18, 18)
+                .bounds(left + 292, top + 174, 18, 18)
                 .build());
         dynamicMinBuyPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MIN_BUY_PLUS_1))
-                .bounds(left + 308, top + 156, 18, 18)
+                .bounds(left + 314, top + 174, 18, 18)
                 .build());
+
         dynamicMaxBuyMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MAX_BUY_MINUS_1))
-                .bounds(left + 286, top + 172, 18, 18)
+                .bounds(left + 292, top + 196, 18, 18)
                 .build());
         dynamicMaxBuyPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MAX_BUY_PLUS_1))
-                .bounds(left + 308, top + 172, 18, 18)
+                .bounds(left + 314, top + 196, 18, 18)
                 .build());
+
         dynamicElasticityMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_ELASTICITY_MINUS))
-                .bounds(left + 420, top + 124, 18, 18)
+                .bounds(left + 466, top + 130, 18, 18)
                 .build());
         dynamicElasticityPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_ELASTICITY_PLUS))
-                .bounds(left + 442, top + 124, 18, 18)
+                .bounds(left + 444, top + 130, 18, 18)
                 .build());
+
         dynamicDecayMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_DECAY_MINUS))
-                .bounds(left + 420, top + 140, 18, 18)
+                .bounds(left + 466, top + 152, 18, 18)
                 .build());
         dynamicDecayPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_DECAY_PLUS))
-                .bounds(left + 442, top + 140, 18, 18)
+                .bounds(left + 444, top + 152, 18, 18)
                 .build());
+
         dynamicInactivitySellMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_INACTIVITY_SELL_MINUS))
-                .bounds(left + 420, top + 156, 18, 18)
+                .bounds(left + 466, top + 174, 18, 18)
                 .build());
         dynamicInactivitySellPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_INACTIVITY_SELL_PLUS))
-                .bounds(left + 442, top + 156, 18, 18)
+                .bounds(left + 444, top + 174, 18, 18)
                 .build());
+
         dynamicInactivityBuyMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_INACTIVITY_BUY_MINUS))
-                .bounds(left + 420, top + 172, 18, 18)
+                .bounds(left + 466, top + 196, 18, 18)
                 .build());
         dynamicInactivityBuyPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_INACTIVITY_BUY_PLUS))
-                .bounds(left + 442, top + 172, 18, 18)
+                .bounds(left + 444, top + 196, 18, 18)
                 .build());
 
         updateButtons();
@@ -299,14 +306,13 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         boolean canSell = hasTrade && menu.selectedTradeCanSell();
         boolean canBuy = hasTrade && menu.selectedTradeCanBuy();
         boolean dynamic = hasTrade && menu.isSelectedTradeDynamic();
-        boolean showMainTab = activeTab == TAB_MAIN;
-        boolean showDynamicTab = activeTab == TAB_DYNAMIC;
 
         if (!admin && activeTab == TAB_DYNAMIC) {
             activeTab = TAB_MAIN;
-            showMainTab = true;
-            showDynamicTab = false;
         }
+
+        boolean showMainTab = activeTab == TAB_MAIN;
+        boolean showDynamicTab = activeTab == TAB_DYNAMIC;
 
         toggleEnabledButton.setMessage(Component.literal(menu.isEnabled() ? "Магазин: Вкл" : "Магазин: Выкл"));
         toggleTradeEnabledButton.setMessage(Component.literal(hasTrade
@@ -329,52 +335,49 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         prevTradeButton.active = menu.getTradeCount() > 1;
         nextTradeButton.active = menu.getTradeCount() > 1;
 
-        infiniteStockButton.visible = admin && showMainTab;
-        infiniteBalanceButton.visible = admin && showMainTab;
-        indestructibleButton.visible = admin && showMainTab;
+        infiniteStockButton.visible = admin;
+        infiniteBalanceButton.visible = admin;
+        indestructibleButton.visible = admin;
+        infiniteStockButton.active = admin;
+        infiniteBalanceButton.active = admin;
+        indestructibleButton.active = admin;
 
-        infiniteStockButton.active = admin && showMainTab;
-        infiniteBalanceButton.active = admin && showMainTab;
-        indestructibleButton.active = admin && showMainTab;
-
-        addSellTradeButton.visible = showMainTab;
-        addBuyTradeButton.visible = showMainTab;
-        addDualTradeButton.visible = showMainTab;
-        removeTradeButton.visible = showMainTab;
-        toggleTradeEnabledButton.visible = showMainTab;
-        toggleTradeModeButton.visible = showMainTab || showDynamicTab;
-
-        addSellTradeButton.active = showMainTab;
-        addBuyTradeButton.active = showMainTab;
-        addDualTradeButton.active = showMainTab;
-        removeTradeButton.active = showMainTab && hasTrade;
-        toggleTradeEnabledButton.active = showMainTab && hasTrade;
+        toggleTradeModeButton.visible = admin;
         toggleTradeModeButton.active = admin && hasTrade;
 
-        setVisibleAndActive(sellPriceMinus1Button, showMainTab, canSell);
-        setVisibleAndActive(sellPricePlus1Button, showMainTab, canSell);
-        setVisibleAndActive(sellPriceMinus10Button, showMainTab, canSell);
-        setVisibleAndActive(sellPricePlus10Button, showMainTab, canSell);
+        setVisibleAndActive(addSellTradeButton, showMainTab, showMainTab);
+        setVisibleAndActive(addBuyTradeButton, showMainTab, showMainTab);
+        setVisibleAndActive(addDualTradeButton, showMainTab, showMainTab);
+        setVisibleAndActive(removeTradeButton, showMainTab, showMainTab && hasTrade);
+        setVisibleAndActive(toggleTradeEnabledButton, showMainTab, showMainTab && hasTrade);
 
-        setVisibleAndActive(buyPriceMinus1Button, showMainTab, canBuy);
-        setVisibleAndActive(buyPricePlus1Button, showMainTab, canBuy);
-        setVisibleAndActive(buyPriceMinus10Button, showMainTab, canBuy);
-        setVisibleAndActive(buyPricePlus10Button, showMainTab, canBuy);
+        setVisibleAndActive(sellPriceMinus1Button, showMainTab && canSell, showMainTab && canSell);
+        setVisibleAndActive(sellPricePlus1Button, showMainTab && canSell, showMainTab && canSell);
+        setVisibleAndActive(sellPriceMinus10Button, showMainTab && canSell, showMainTab && canSell);
+        setVisibleAndActive(sellPricePlus10Button, showMainTab && canSell, showMainTab && canSell);
 
-        setVisibleAndActive(sellBatchMinusButton, showMainTab, canSell);
-        setVisibleAndActive(sellBatchPlusButton, showMainTab, canSell);
-        setVisibleAndActive(buyBatchMinusButton, showMainTab, canBuy);
-        setVisibleAndActive(buyBatchPlusButton, showMainTab, canBuy);
+        setVisibleAndActive(buyPriceMinus1Button, showMainTab && canBuy, showMainTab && canBuy);
+        setVisibleAndActive(buyPricePlus1Button, showMainTab && canBuy, showMainTab && canBuy);
+        setVisibleAndActive(buyPriceMinus10Button, showMainTab && canBuy, showMainTab && canBuy);
+        setVisibleAndActive(buyPricePlus10Button, showMainTab && canBuy, showMainTab && canBuy);
+
+        setVisibleAndActive(sellBatchMinusButton, showMainTab && canSell, showMainTab && canSell);
+        setVisibleAndActive(sellBatchPlusButton, showMainTab && canSell, showMainTab && canSell);
+        setVisibleAndActive(buyBatchMinusButton, showMainTab && canBuy, showMainTab && canBuy);
+        setVisibleAndActive(buyBatchPlusButton, showMainTab && canBuy, showMainTab && canBuy);
 
         boolean dynamicEditable = showDynamicTab && admin && hasTrade && dynamic;
+
         setVisibleAndActive(dynamicMinSellMinusButton, showDynamicTab && canSell, dynamicEditable && canSell);
         setVisibleAndActive(dynamicMinSellPlusButton, showDynamicTab && canSell, dynamicEditable && canSell);
         setVisibleAndActive(dynamicMaxSellMinusButton, showDynamicTab && canSell, dynamicEditable && canSell);
         setVisibleAndActive(dynamicMaxSellPlusButton, showDynamicTab && canSell, dynamicEditable && canSell);
+
         setVisibleAndActive(dynamicMinBuyMinusButton, showDynamicTab && canBuy, dynamicEditable && canBuy);
         setVisibleAndActive(dynamicMinBuyPlusButton, showDynamicTab && canBuy, dynamicEditable && canBuy);
         setVisibleAndActive(dynamicMaxBuyMinusButton, showDynamicTab && canBuy, dynamicEditable && canBuy);
         setVisibleAndActive(dynamicMaxBuyPlusButton, showDynamicTab && canBuy, dynamicEditable && canBuy);
+
         setVisibleAndActive(dynamicElasticityMinusButton, showDynamicTab, dynamicEditable);
         setVisibleAndActive(dynamicElasticityPlusButton, showDynamicTab, dynamicEditable);
         setVisibleAndActive(dynamicDecayMinusButton, showDynamicTab, dynamicEditable);
@@ -427,29 +430,23 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         graphics.drawString(this.font, "Вывод", 112, 66, 0xFFFFFF, false);
 
         graphics.drawString(this.font, "Сделки", 184, 32, 0xFFFFFF, false);
-        graphics.drawString(this.font, tradeCounterText(), 234, 18, 0xE0E0E0, false);
+        graphics.drawString(this.font, tradeCounterText(), 236, 18, 0xE0E0E0, false);
 
         ItemStack selected = this.menu.getSelectedTradeDisplayStack();
         String tradeName = selected.isEmpty() ? "Нет сделки" : selected.getHoverName().getString();
 
-        graphics.drawString(this.font, trimToWidth(tradeName, 132), 212, 42, 0xFFFFFF, false);
+        graphics.drawString(this.font, trimToWidth(tradeName, 160), 212, 42, 0xFFFFFF, false);
         graphics.drawString(this.font, "Статус: " + selectedTradeStatus(), 212, 54, 0xD8D8D8, false);
         graphics.drawString(this.font, "Тип: " + selectedTradeType(), 212, 66, 0xD8D8D8, false);
 
+        if (this.menu.isAdminShop()) {
+            graphics.drawString(this.font, "Тип магазина: админ", 212, 74, 0xFFD080, false);
+        } else {
+            graphics.drawString(this.font, "Тип магазина: игрок", 212, 74, 0xA8FFA8, false);
+        }
+
         if (activeTab == TAB_MAIN) {
-            graphics.drawString(this.font, "ЛКМ по иконке", 362, 42, 0xC8C8C8, false);
-            graphics.drawString(this.font, "сменить предмет", 362, 54, 0xC8C8C8, false);
-
-            if (this.menu.isAdminShop()) {
-                graphics.drawString(this.font, "Тип магазина: админ", 362, 66, 0xFFD080, false);
-            } else {
-                graphics.drawString(this.font, "Тип магазина: игрок", 362, 66, 0xA8FFA8, false);
-            }
-
-            graphics.drawString(this.font, "Продажа: " + tradeValueText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellPrice()), 184, 162, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Скупка: " + tradeValueText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyPrice()), 184, 178, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Пачка прод.: " + batchText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellBatch()), 184, 194, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Пачка скуп.: " + batchText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyBatch()), 184, 210, 0xFFFFFF, false);
+            drawMainTabLabels(graphics);
         } else {
             drawDynamicTabLabels(graphics);
         }
@@ -457,15 +454,22 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         graphics.drawString(this.font, this.playerInventoryTitle, 8, this.inventoryLabelY, 0xFFFFFF, false);
     }
 
+    private void drawMainTabLabels(GuiGraphics graphics) {
+        graphics.drawString(this.font, "Продажа: " + tradeValueText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellPrice()), 184, 188, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Скупка: " + tradeValueText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyPrice()), 184, 210, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Пачка прод.: " + batchText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellBatch()), 184, 232, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Пачка скуп.: " + batchText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyBatch()), 184, 254, 0xFFFFFF, false);
+    }
+
     private void drawDynamicTabLabels(GuiGraphics graphics) {
+        graphics.drawString(this.font, "База прод.: " + tradeValueText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellPrice()), 184, 112, 0xFFFFFF, false);
+        graphics.drawString(this.font, "База скуп.: " + tradeValueText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyPrice()), 184, 124, 0xFFFFFF, false);
+
         if (!this.menu.isAdminShop()) {
-            graphics.drawString(this.font, "Динамика доступна только", 184, 112, 0xFFB0B0, false);
-            graphics.drawString(this.font, "для админ-магазина.", 184, 124, 0xFFB0B0, false);
+            graphics.drawString(this.font, "Динамика доступна только", 184, 148, 0xFFB0B0, false);
+            graphics.drawString(this.font, "для админ-магазина.", 184, 160, 0xFFB0B0, false);
             return;
         }
-
-        graphics.drawString(this.font, "База прод.: " + tradeValueText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellPrice()), 184, 96, 0xFFFFFF, false);
-        graphics.drawString(this.font, "База скуп.: " + tradeValueText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyPrice()), 184, 108, 0xFFFFFF, false);
 
         if (!this.menu.hasSelectedTrade()) {
             graphics.drawString(this.font, "Выбери сделку.", 184, 148, 0xFFB0B0, false);
@@ -473,20 +477,20 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         }
 
         if (!this.menu.isSelectedTradeDynamic()) {
-            graphics.drawString(this.font, "Сделка сейчас в фиксированном", 184, 140, 0xFFB0B0, false);
-            graphics.drawString(this.font, "режиме. Переключи режим", 184, 152, 0xFFB0B0, false);
-            graphics.drawString(this.font, "кнопкой \"Режим\" выше.", 184, 164, 0xFFB0B0, false);
+            graphics.drawString(this.font, "Сделка сейчас в фиксированном режиме.", 184, 148, 0xFFB0B0, false);
+            graphics.drawString(this.font, "Сначала нажми кнопку \"Режим\" сверху.", 184, 160, 0xFFB0B0, false);
             return;
         }
 
-        graphics.drawString(this.font, dynamicRow("Мин. продажа", this.menu.selectedTradeCanSell(), String.valueOf(this.menu.getSelectedTradeMinSellPrice())), 184, 128, 0xFFFFFF, false);
-        graphics.drawString(this.font, dynamicRow("Макс. продажа", this.menu.selectedTradeCanSell(), String.valueOf(this.menu.getSelectedTradeMaxSellPrice())), 184, 144, 0xFFFFFF, false);
-        graphics.drawString(this.font, dynamicRow("Мин. скупка", this.menu.selectedTradeCanBuy(), String.valueOf(this.menu.getSelectedTradeMinBuyPrice())), 184, 160, 0xFFFFFF, false);
-        graphics.drawString(this.font, dynamicRow("Макс. скупка", this.menu.selectedTradeCanBuy(), String.valueOf(this.menu.getSelectedTradeMaxBuyPrice())), 184, 176, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Эластичность: " + formatDouble(this.menu.getSelectedTradeElasticity()), 316, 128, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Затухание: " + formatDouble(this.menu.getSelectedTradeDecayPerStep()), 316, 144, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Пад. продажи: " + formatDouble(this.menu.getSelectedTradeInactivitySellDrop()), 316, 160, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Рост скупки: " + formatDouble(this.menu.getSelectedTradeInactivityBuyRise()), 316, 176, 0xFFFFFF, false);
+        graphics.drawString(this.font, dynamicRow("Мин. продажа", this.menu.selectedTradeCanSell(), String.valueOf(this.menu.getSelectedTradeMinSellPrice())), 184, 146, 0xFFFFFF, false);
+        graphics.drawString(this.font, dynamicRow("Макс. продажа", this.menu.selectedTradeCanSell(), String.valueOf(this.menu.getSelectedTradeMaxSellPrice())), 184, 168, 0xFFFFFF, false);
+        graphics.drawString(this.font, dynamicRow("Мин. скупка", this.menu.selectedTradeCanBuy(), String.valueOf(this.menu.getSelectedTradeMinBuyPrice())), 184, 190, 0xFFFFFF, false);
+        graphics.drawString(this.font, dynamicRow("Макс. скупка", this.menu.selectedTradeCanBuy(), String.valueOf(this.menu.getSelectedTradeMaxBuyPrice())), 184, 212, 0xFFFFFF, false);
+
+        graphics.drawString(this.font, "Эластичность: " + formatDouble(this.menu.getSelectedTradeElasticity()), 340, 146, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Затухание: " + formatDouble(this.menu.getSelectedTradeDecayPerStep()), 340, 168, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Пад. продажи: " + formatDouble(this.menu.getSelectedTradeInactivitySellDrop()), 340, 190, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Рост скупки: " + formatDouble(this.menu.getSelectedTradeInactivityBuyRise()), 340, 212, 0xFFFFFF, false);
     }
 
     private String dynamicRow(String label, boolean supported, String value) {
