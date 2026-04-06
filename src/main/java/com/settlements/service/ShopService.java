@@ -374,6 +374,7 @@ public final class ShopService {
         shop.deposit(amount, player.level().getGameTime());
         syncShopRecordAndBlockEntity(player, shop);
     }
+
     public static void withdrawAllFromShopAt(ServerPlayer player, BlockPos pos) {
         ShopRecord shop = getShopAt(player, pos);
         long amount = shop.getBalance();
@@ -384,6 +385,7 @@ public final class ShopService {
 
         withdrawFromShopAt(player, pos, amount);
     }
+
     public static void withdrawFromShopAt(ServerPlayer player, BlockPos pos, long amount) {
         if (amount <= 0L) {
             throw new IllegalArgumentException("Сумма должна быть больше нуля.");
@@ -411,88 +413,192 @@ public final class ShopService {
     }
 
     public static void addSellTradeFromMainHand(ServerPlayer player, int batchSize, long price) {
-        ShopRecord shop = getLookedAtShop(player);
+        addSellTradeFromMainHandAt(player, getLookedAtShopPosOrThrow(player), batchSize, price);
+    }
 
-        if (shop.isAdminShop()) {
-            requireAdminEditor(player);
-        } else {
-            requireManageLookedAtShop(player, shop);
-        }
+    public static void addSellTradeFromMainHandAt(ServerPlayer player, BlockPos pos, int batchSize, long price) {
+        ShopRecord shop = getShopAt(player, pos);
+        requireTradeEditor(player, shop);
 
-        ItemStack mainHand = player.getMainHandItem();
-        if (mainHand.isEmpty()) {
-            throw new IllegalStateException("Нужно держать предмет в главной руке.");
-        }
-
-        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(mainHand.getItem());
-        if (itemId == null) {
-            throw new IllegalStateException("Не удалось определить предмет.");
-        }
-
-        shop.addTrade(ShopTradeEntry.createSell(itemId.toString(), batchSize, price), player.level().getGameTime());
+        ResourceLocation itemId = requireMainHandItemId(player);
+        shop.addTrade(ShopTradeEntry.createSell(itemId.toString(), Math.max(1, batchSize), Math.max(1L, price)), player.level().getGameTime());
         syncShopRecordAndBlockEntity(player, shop);
     }
 
     public static void addBuyTradeFromMainHand(ServerPlayer player, int batchSize, long price) {
-        ShopRecord shop = getLookedAtShop(player);
+        addBuyTradeFromMainHandAt(player, getLookedAtShopPosOrThrow(player), batchSize, price);
+    }
 
-        if (shop.isAdminShop()) {
-            requireAdminEditor(player);
-        } else {
-            requireManageLookedAtShop(player, shop);
-        }
+    public static void addBuyTradeFromMainHandAt(ServerPlayer player, BlockPos pos, int batchSize, long price) {
+        ShopRecord shop = getShopAt(player, pos);
+        requireTradeEditor(player, shop);
 
-        ItemStack mainHand = player.getMainHandItem();
-        if (mainHand.isEmpty()) {
-            throw new IllegalStateException("Нужно держать предмет в главной руке.");
-        }
-
-        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(mainHand.getItem());
-        if (itemId == null) {
-            throw new IllegalStateException("Не удалось определить предмет.");
-        }
-
-        shop.addTrade(ShopTradeEntry.createBuy(itemId.toString(), batchSize, price), player.level().getGameTime());
+        ResourceLocation itemId = requireMainHandItemId(player);
+        shop.addTrade(ShopTradeEntry.createBuy(itemId.toString(), Math.max(1, batchSize), Math.max(1L, price)), player.level().getGameTime());
         syncShopRecordAndBlockEntity(player, shop);
     }
 
     public static void addDualTradeFromMainHand(ServerPlayer player, int sellBatch, long sellPrice, int buyBatch, long buyPrice) {
-        ShopRecord shop = getLookedAtShop(player);
+        addDualTradeFromMainHandAt(player, getLookedAtShopPosOrThrow(player), sellBatch, sellPrice, buyBatch, buyPrice);
+    }
 
-        if (shop.isAdminShop()) {
-            requireAdminEditor(player);
-        } else {
-            requireManageLookedAtShop(player, shop);
-        }
+    public static void addDualTradeFromMainHandAt(ServerPlayer player, BlockPos pos, int sellBatch, long sellPrice, int buyBatch, long buyPrice) {
+        ShopRecord shop = getShopAt(player, pos);
+        requireTradeEditor(player, shop);
 
-        ItemStack mainHand = player.getMainHandItem();
-        if (mainHand.isEmpty()) {
-            throw new IllegalStateException("Нужно держать предмет в главной руке.");
-        }
-
-        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(mainHand.getItem());
-        if (itemId == null) {
-            throw new IllegalStateException("Не удалось определить предмет.");
-        }
-
-        shop.addTrade(ShopTradeEntry.createDual(itemId.toString(), sellBatch, sellPrice, buyBatch, buyPrice), player.level().getGameTime());
+        ResourceLocation itemId = requireMainHandItemId(player);
+        shop.addTrade(
+                ShopTradeEntry.createDual(
+                        itemId.toString(),
+                        Math.max(1, sellBatch),
+                        Math.max(1L, sellPrice),
+                        Math.max(1, buyBatch),
+                        Math.max(1L, buyPrice)
+                ),
+                player.level().getGameTime()
+        );
         syncShopRecordAndBlockEntity(player, shop);
     }
 
     public static void removeTradeFromLookedAtShop(ServerPlayer player, int index) {
-        ShopRecord shop = getLookedAtShop(player);
+        removeTradeFromShopAt(player, getLookedAtShopPosOrThrow(player), index);
+    }
 
-        if (shop.isAdminShop()) {
-            requireAdminEditor(player);
-        } else {
-            requireManageLookedAtShop(player, shop);
-        }
+    public static void removeTradeFromShopAt(ServerPlayer player, BlockPos pos, int index) {
+        ShopRecord shop = getShopAt(player, pos);
+        requireTradeEditor(player, shop);
 
         boolean removed = shop.removeTradeByHumanIndex(index, player.level().getGameTime());
         if (!removed) {
             throw new IllegalStateException("Сделка с таким индексом не найдена.");
         }
 
+        syncShopRecordAndBlockEntity(player, shop);
+    }
+
+    public static void setTradeEnabledAt(ServerPlayer player, BlockPos pos, int index, boolean enabled) {
+        ShopRecord shop = getShopAt(player, pos);
+        requireTradeEditor(player, shop);
+
+        ShopTradeEntry trade = shop.getTradeByHumanIndex(index);
+        if (trade == null) {
+            throw new IllegalStateException("Сделка не найдена.");
+        }
+
+        trade.setEnabled(enabled);
+        syncShopRecordAndBlockEntity(player, shop);
+    }
+
+    public static void changeTradeSellPriceAt(ServerPlayer player, BlockPos pos, int index, long delta) {
+        ShopRecord shop = getShopAt(player, pos);
+        requireTradeEditor(player, shop);
+
+        ShopTradeEntry trade = shop.getTradeByHumanIndex(index);
+        if (trade == null) {
+            throw new IllegalStateException("Сделка не найдена.");
+        }
+        if (!trade.canSellToPlayer()) {
+            throw new IllegalStateException("Эта сделка не продаёт товар игроку.");
+        }
+
+        long newSellPrice = Math.max(1L, trade.getSellPrice() + delta);
+        ShopTradeEntry updated = rebuildTradeWithOverrides(trade, null, null, newSellPrice, null);
+        replaceTradeOrThrow(shop, index, updated, player.level().getGameTime());
+        syncShopRecordAndBlockEntity(player, shop);
+    }
+
+    public static void changeTradeBuyPriceAt(ServerPlayer player, BlockPos pos, int index, long delta) {
+        ShopRecord shop = getShopAt(player, pos);
+        requireTradeEditor(player, shop);
+
+        ShopTradeEntry trade = shop.getTradeByHumanIndex(index);
+        if (trade == null) {
+            throw new IllegalStateException("Сделка не найдена.");
+        }
+        if (!trade.canBuyFromPlayer()) {
+            throw new IllegalStateException("Эта сделка не скупает товар у игрока.");
+        }
+
+        long newBuyPrice = Math.max(1L, trade.getBuyPrice() + delta);
+        ShopTradeEntry updated = rebuildTradeWithOverrides(trade, null, null, null, newBuyPrice);
+        replaceTradeOrThrow(shop, index, updated, player.level().getGameTime());
+        syncShopRecordAndBlockEntity(player, shop);
+    }
+
+    public static void changeTradeSellBatchAt(ServerPlayer player, BlockPos pos, int index, int delta) {
+        ShopRecord shop = getShopAt(player, pos);
+        requireTradeEditor(player, shop);
+
+        ShopTradeEntry trade = shop.getTradeByHumanIndex(index);
+        if (trade == null) {
+            throw new IllegalStateException("Сделка не найдена.");
+        }
+        if (!trade.canSellToPlayer()) {
+            throw new IllegalStateException("Эта сделка не продаёт товар игроку.");
+        }
+
+        int newBatch = Math.max(1, trade.getSellBatchSize() + delta);
+        ShopTradeEntry updated = rebuildTradeWithOverrides(trade, newBatch, null, null, null);
+        replaceTradeOrThrow(shop, index, updated, player.level().getGameTime());
+        syncShopRecordAndBlockEntity(player, shop);
+    }
+
+    public static void changeTradeBuyBatchAt(ServerPlayer player, BlockPos pos, int index, int delta) {
+        ShopRecord shop = getShopAt(player, pos);
+        requireTradeEditor(player, shop);
+
+        ShopTradeEntry trade = shop.getTradeByHumanIndex(index);
+        if (trade == null) {
+            throw new IllegalStateException("Сделка не найдена.");
+        }
+        if (!trade.canBuyFromPlayer()) {
+            throw new IllegalStateException("Эта сделка не скупает товар у игрока.");
+        }
+
+        int newBatch = Math.max(1, trade.getBuyBatchSize() + delta);
+        ShopTradeEntry updated = rebuildTradeWithOverrides(trade, null, newBatch, null, null);
+        replaceTradeOrThrow(shop, index, updated, player.level().getGameTime());
+        syncShopRecordAndBlockEntity(player, shop);
+    }
+
+    public static void toggleTradePriceModeAt(ServerPlayer player, BlockPos pos, int index) {
+        ShopRecord shop = getShopAt(player, pos);
+        if (!shop.isAdminShop()) {
+            throw new IllegalStateException("Переключение режима цены доступно только у админ-магазина.");
+        }
+        requireAdminEditor(player);
+
+        ShopTradeEntry trade = shop.getTradeByHumanIndex(index);
+        if (trade == null) {
+            throw new IllegalStateException("Сделка не найдена.");
+        }
+
+        ShopTradeEntry updated = rebuildTradeWithOverrides(trade, null, null, null, null);
+        if (trade.getPriceMode() == PriceMode.DYNAMIC) {
+            updated.setFixedPricing();
+        } else {
+            long sellBase = trade.canSellToPlayer() ? Math.max(1L, trade.getSellPrice()) : 0L;
+            long buyBase = trade.canBuyFromPlayer() ? Math.max(1L, trade.getBuyPrice()) : 0L;
+            long minSell = trade.canSellToPlayer() ? Math.max(1L, sellBase / 2L) : 1L;
+            long maxSell = trade.canSellToPlayer() ? Math.max(minSell, sellBase * 2L) : 1L;
+            long minBuy = trade.canBuyFromPlayer() ? Math.max(1L, buyBase / 2L) : 1L;
+            long maxBuy = trade.canBuyFromPlayer() ? Math.max(minBuy, buyBase * 2L) : 1L;
+
+            updated.setDynamicPricing(
+                    sellBase,
+                    buyBase,
+                    minSell,
+                    maxSell,
+                    minBuy,
+                    maxBuy,
+                    0.01D,
+                    0.98D,
+                    0.0D,
+                    0.0D
+            );
+        }
+
+        replaceTradeOrThrow(shop, index, updated, player.level().getGameTime());
         syncShopRecordAndBlockEntity(player, shop);
     }
 
@@ -669,6 +775,65 @@ public final class ShopService {
         syncShopRecordAndBlockEntity(player, shop);
     }
 
+    private static void replaceTradeOrThrow(ShopRecord shop, int index, ShopTradeEntry updatedTrade, long gameTime) {
+        boolean replaced = shop.replaceTradeByHumanIndex(index, updatedTrade, gameTime);
+        if (!replaced) {
+            throw new IllegalStateException("Сделка с таким индексом не найдена.");
+        }
+    }
+
+    private static ShopTradeEntry rebuildTradeWithOverrides(ShopTradeEntry trade,
+                                                            Integer sellBatchOverride,
+                                                            Integer buyBatchOverride,
+                                                            Long sellPriceOverride,
+                                                            Long buyPriceOverride) {
+        int sellBatch = sellBatchOverride != null ? Math.max(1, sellBatchOverride) : trade.getSellBatchSize();
+        int buyBatch = buyBatchOverride != null ? Math.max(1, buyBatchOverride) : trade.getBuyBatchSize();
+        long sellPrice = sellPriceOverride != null ? Math.max(0L, sellPriceOverride) : trade.getSellPrice();
+        long buyPrice = buyPriceOverride != null ? Math.max(0L, buyPriceOverride) : trade.getBuyPrice();
+
+        ShopTradeEntry rebuilt = new ShopTradeEntry(
+                trade.getId(),
+                trade.getItemId(),
+                trade.isEnabled(),
+                sellBatch,
+                buyBatch,
+                sellPrice,
+                buyPrice,
+                trade.canSellToPlayer(),
+                trade.canBuyFromPlayer(),
+                trade.getMinStockToSell(),
+                trade.requireRealStock(),
+                trade.requireRealBalance()
+        );
+
+        if (trade.getPriceMode() == PriceMode.DYNAMIC) {
+            long baseSell = trade.canSellToPlayer() ? Math.max(1L, sellPrice) : 0L;
+            long baseBuy = trade.canBuyFromPlayer() ? Math.max(1L, buyPrice) : 0L;
+            long minSell = trade.canSellToPlayer() ? Math.min(Math.max(1L, baseSell), trade.getMinSellPrice()) : 1L;
+            long maxSell = trade.canSellToPlayer() ? Math.max(Math.max(1L, baseSell), trade.getMaxSellPrice()) : 1L;
+            long minBuy = trade.canBuyFromPlayer() ? Math.min(Math.max(1L, baseBuy), trade.getMinBuyPrice()) : 1L;
+            long maxBuy = trade.canBuyFromPlayer() ? Math.max(Math.max(1L, baseBuy), trade.getMaxBuyPrice()) : 1L;
+
+            rebuilt.setDynamicPricing(
+                    baseSell,
+                    baseBuy,
+                    minSell,
+                    maxSell,
+                    minBuy,
+                    maxBuy,
+                    trade.getElasticity(),
+                    trade.getDecayPerStep(),
+                    trade.getInactivitySellDrop(),
+                    trade.getInactivityBuyRise()
+            );
+        } else {
+            rebuilt.setFixedPricing();
+        }
+
+        return rebuilt;
+    }
+
     public static void transferShopsToLeaderOnMemberLeave(SettlementSavedData data, UUID settlementId, UUID oldOwnerUuid, UUID leaderUuid, long gameTime) {
         List<ShopRecord> shops = data.getShopsByOwner(settlementId, oldOwnerUuid);
 
@@ -707,6 +872,29 @@ public final class ShopService {
         if (player.level().getBlockEntity(shop.getPos()) instanceof ShopBlockEntity shopBlockEntity) {
             shopBlockEntity.syncFromRecord(shop);
         }
+    }
+
+    private static void requireTradeEditor(ServerPlayer player, ShopRecord shop) {
+        if (shop.isAdminShop()) {
+            requireAdminEditor(player);
+            return;
+        }
+
+        requireManageLookedAtShop(player, shop);
+    }
+
+    private static ResourceLocation requireMainHandItemId(ServerPlayer player) {
+        ItemStack mainHand = player.getMainHandItem();
+        if (mainHand.isEmpty()) {
+            throw new IllegalStateException("Нужно держать предмет в главной руке.");
+        }
+
+        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(mainHand.getItem());
+        if (itemId == null) {
+            throw new IllegalStateException("Не удалось определить предмет.");
+        }
+
+        return itemId;
     }
 
     private static Settlement requireManageLookedAtShop(ServerPlayer player, ShopRecord shop) {

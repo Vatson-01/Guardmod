@@ -257,6 +257,16 @@ public class ShopRecord {
         return true;
     }
 
+    public boolean replaceTradeByHumanIndex(int index, ShopTradeEntry trade, long gameTime) {
+        if (index < 1 || index > trades.size() || trade == null) {
+            return false;
+        }
+
+        trades.set(index - 1, trade);
+        touch(gameTime);
+        return true;
+    }
+
     private void touch(long gameTime) {
         this.updatedAt = gameTime;
     }
