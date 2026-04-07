@@ -4,7 +4,6 @@ import com.settlements.data.SettlementSavedData;
 import com.settlements.data.model.PriceMode;
 import com.settlements.data.model.ShopRecord;
 import com.settlements.data.model.ShopTradeEntry;
-import com.settlements.network.ShopManagementPackets;
 import com.settlements.registry.ModBlocks;
 import com.settlements.registry.ModMenuTypes;
 import com.settlements.service.ShopService;
@@ -117,6 +116,8 @@ public class ShopManagementMenu extends AbstractContainerMenu {
     private static final int DATA_SELECTED_INACTIVITY_BUY_SCALED = 30;
     private static final int DATA_COUNT = 31;
 
+    private static final double DOUBLE_SYNC_SCALE = 1000000.0D;
+
     private final BlockPos shopPos;
     private final String shopName;
     private final ContainerData menuData;
@@ -154,7 +155,6 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         this.menuData = menuData;
         this.selectedTradeIndex = 1;
         this.selectedTradeDisplay = new SimpleContainer(1);
-
 
         this.addDataSlots(menuData);
 
@@ -338,7 +338,7 @@ public class ShopManagementMenu extends AbstractContainerMenu {
     }
 
     private static int scaleDouble(double value) {
-        return (int) Math.round(value * 1000.0D);
+        return (int) Math.round(value * DOUBLE_SYNC_SCALE);
     }
 
     private void addPlayerInventorySlots(Inventory playerInventory) {
@@ -464,19 +464,19 @@ public class ShopManagementMenu extends AbstractContainerMenu {
     }
 
     public double getSelectedTradeElasticity() {
-        return menuData.get(DATA_SELECTED_ELASTICITY_SCALED) / 1000.0D;
+        return menuData.get(DATA_SELECTED_ELASTICITY_SCALED) / DOUBLE_SYNC_SCALE;
     }
 
     public double getSelectedTradeDecayPerStep() {
-        return menuData.get(DATA_SELECTED_DECAY_SCALED) / 1000.0D;
+        return menuData.get(DATA_SELECTED_DECAY_SCALED) / DOUBLE_SYNC_SCALE;
     }
 
     public double getSelectedTradeInactivitySellDrop() {
-        return menuData.get(DATA_SELECTED_INACTIVITY_SELL_SCALED) / 1000.0D;
+        return menuData.get(DATA_SELECTED_INACTIVITY_SELL_SCALED) / DOUBLE_SYNC_SCALE;
     }
 
     public double getSelectedTradeInactivityBuyRise() {
-        return menuData.get(DATA_SELECTED_INACTIVITY_BUY_SCALED) / 1000.0D;
+        return menuData.get(DATA_SELECTED_INACTIVITY_BUY_SCALED) / DOUBLE_SYNC_SCALE;
     }
 
     public ItemStack getSelectedTradeDisplayStack() {
@@ -858,7 +858,7 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         }
 
         elasticity = clamp(elasticity, 0.0D, 10.0D);
-        decayPerStep = clamp(decayPerStep, 0.0D, 10.0D);
+        decayPerStep = Math.max(0.0D, decayPerStep);
         inactivitySellDrop = clamp(inactivitySellDrop, 0.0D, 10.0D);
         inactivityBuyRise = clamp(inactivityBuyRise, 0.0D, 10.0D);
 
