@@ -19,17 +19,17 @@ public final class ModItems {
 
     public static final RegistryObject<Item> BRONZE_COIN = ITEMS.register(
             "bronze_coin",
-            () -> new Item(new Item.Properties())
+            () -> new Item(new Item.Properties().stacksTo(50))
     );
 
     public static final RegistryObject<Item> SILVER_COIN = ITEMS.register(
             "silver_coin",
-            () -> new Item(new Item.Properties())
+            () -> new Item(new Item.Properties().stacksTo(50))
     );
 
     public static final RegistryObject<Item> GOLD_COIN = ITEMS.register(
             "gold_coin",
-            () -> new Item(new Item.Properties())
+            () -> new Item(new Item.Properties().stacksTo(50))
     );
 
     private ModItems() {

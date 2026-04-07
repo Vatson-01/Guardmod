@@ -297,7 +297,7 @@ public class ShopTradeEntry {
         this.maxBuyPrice = Math.max(this.minBuyPrice, maxBuyPrice);
 
         this.elasticity = Math.max(0.0D, elasticity);
-        this.decayPerStep = clampDouble(decayPerStep, 0.0D, 1.0D);
+        this.decayPerStep = clampDouble(decayPerStep, 0.0D, 10.0D);
         this.inactivitySellDrop = Math.max(0.0D, inactivitySellDrop);
         this.inactivityBuyRise = Math.max(0.0D, inactivityBuyRise);
 
