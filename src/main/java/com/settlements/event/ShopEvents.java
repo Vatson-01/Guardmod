@@ -52,6 +52,12 @@ public final class ShopEvents {
             return;
         }
 
+        if (!(player.hasPermissions(2) && player.isCreative())) {
+            event.setCanceled(true);
+            player.displayClientMessage(Component.literal("Магазины нельзя ломать вручную."), true);
+            return;
+        }
+
         try {
             ShopService.handlePlayerBreakShop(player, event.getPos());
         } catch (Exception e) {

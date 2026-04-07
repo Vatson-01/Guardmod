@@ -1,8 +1,10 @@
 package com.settlements.world.block;
 
 import com.settlements.data.SettlementSavedData;
+import com.settlements.data.model.Settlement;
 import com.settlements.data.model.ShopRecord;
 import com.settlements.service.ShopService;
+import com.settlements.service.WarService;
 import com.settlements.world.blockentity.ShopBlockEntity;
 import com.settlements.world.menu.ShopMenu;
 import net.minecraft.core.BlockPos;
@@ -10,9 +12,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.MenuProvider;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
@@ -51,9 +54,15 @@ public class ShopBlock extends BaseEntityBlock {
             return InteractionResult.PASS;
         }
 
-        ShopRecord shop = SettlementSavedData.get(serverPlayer.server).getShopByPos(serverPlayer.level(), pos);
+        SettlementSavedData data = SettlementSavedData.get(serverPlayer.server);
+        ShopRecord shop = data.getShopByPos(serverPlayer.level(), pos);
         if (shop == null) {
             serverPlayer.displayClientMessage(Component.literal("Этот блок магазина еще не зарегистрирован."), true);
+            return InteractionResult.CONSUME;
+        }
+
+        if (isHostileSiegeAccess(serverPlayer, pos, data)) {
+            serverPlayer.displayClientMessage(Component.literal("Во время осады вражеские магазины недоступны."), true);
             return InteractionResult.CONSUME;
         }
 
@@ -80,6 +89,28 @@ public class ShopBlock extends BaseEntityBlock {
         );
 
         return InteractionResult.CONSUME;
+    }
+
+    private boolean isHostileSiegeAccess(ServerPlayer player, BlockPos pos, SettlementSavedData data) {
+        Settlement targetSettlement = data.getSettlementByChunk(player.level(), new ChunkPos(pos));
+        if (targetSettlement == null) {
+            return false;
+        }
+
+        Settlement attackerSettlement = data.getSettlementByPlayer(player.getUUID());
+        if (attackerSettlement == null) {
+            return false;
+        }
+
+        if (attackerSettlement.getId().equals(targetSettlement.getId())) {
+            return false;
+        }
+
+        return WarService.isActiveSiegeBetween(
+                player.server,
+                attackerSettlement.getId(),
+                targetSettlement.getId()
+        );
     }
 
     @Override

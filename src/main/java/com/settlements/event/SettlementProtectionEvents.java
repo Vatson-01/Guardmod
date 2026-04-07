@@ -1,15 +1,19 @@
 package com.settlements.event;
 
 import com.settlements.SettlementsMod;
+import com.settlements.data.SettlementSavedData;
+import com.settlements.data.model.Settlement;
 import com.settlements.registry.ModBlocks;
 import com.settlements.service.PermissionService;
 import com.settlements.service.ProtectedAction;
+import com.settlements.service.WarService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ButtonBlock;
 import net.minecraft.world.level.block.DoorBlock;
@@ -34,10 +38,24 @@ public final class SettlementProtectionEvents {
             return;
         }
 
-        if (!PermissionService.canPerform(player, event.getPos(), ProtectedAction.BREAK_BLOCK)) {
+        if (isShopBlock(player, event.getPos()) && !canAdminBypassShopBreak(player)) {
             event.setCanceled(true);
-            player.displayClientMessage(Component.literal("Ты не можешь ломать блоки на этой территории."), true);
+            player.displayClientMessage(Component.literal("Магазины нельзя ломать вручную."), true);
+            return;
         }
+
+        if (PermissionService.canPerform(player, event.getPos(), ProtectedAction.BREAK_BLOCK)) {
+            return;
+        }
+
+        if (isHostileSiegeAttempt(player, event.getPos())) {
+            event.setCanceled(true);
+            player.displayClientMessage(Component.literal("Во время осады руками ломать блоки нельзя."), true);
+            return;
+        }
+
+        event.setCanceled(true);
+        player.displayClientMessage(Component.literal("Ты не можешь ломать блоки на этой территории."), true);
     }
 
     @SubscribeEvent
@@ -62,16 +80,130 @@ public final class SettlementProtectionEvents {
             return;
         }
 
+        if (isHostileShopAccess(player, event.getPos())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
+            player.displayClientMessage(Component.literal("Во время осады вражеские магазины недоступны."), true);
+            return;
+        }
+
         ProtectedAction action = resolveAction(player, event.getPos());
         if (action == null) {
             return;
         }
 
-        if (!PermissionService.canPerform(player, event.getPos(), action)) {
-            event.setCanceled(true);
-            event.setCancellationResult(InteractionResult.FAIL);
-            player.displayClientMessage(Component.literal("У тебя нет доступа к этому участку."), true);
+        if (PermissionService.canPerform(player, event.getPos(), action)) {
+            return;
         }
+
+        if (canUseSiegeOverride(player, event.getPos(), action)) {
+            return;
+        }
+
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.FAIL);
+        player.displayClientMessage(Component.literal("У тебя нет доступа к этому участку."), true);
+    }
+
+    private static boolean canUseSiegeOverride(ServerPlayer player, BlockPos pos, ProtectedAction action) {
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+
+        Settlement targetSettlement = data.getSettlementByChunk(player.level(), new ChunkPos(pos));
+        if (targetSettlement == null) {
+            return false;
+        }
+
+        Settlement attackerSettlement = data.getSettlementByPlayer(player.getUUID());
+        if (attackerSettlement == null) {
+            return false;
+        }
+
+        if (attackerSettlement.getId().equals(targetSettlement.getId())) {
+            return false;
+        }
+
+        switch (action) {
+            case OPEN_DOOR:
+                return WarService.canAttackerUseDoor(
+                        player.server,
+                        attackerSettlement.getId(),
+                        targetSettlement.getId()
+                );
+            case OPEN_CONTAINER:
+                if (isShopBlock(player, pos)) {
+                    return false;
+                }
+                return WarService.canAttackerOpenContainer(
+                        player.server,
+                        attackerSettlement.getId(),
+                        targetSettlement.getId()
+                );
+            case USE_REDSTONE:
+            case BREAK_BLOCK:
+            case PLACE_BLOCK:
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isHostileSiegeAttempt(ServerPlayer player, BlockPos pos) {
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+
+        Settlement targetSettlement = data.getSettlementByChunk(player.level(), new ChunkPos(pos));
+        if (targetSettlement == null) {
+            return false;
+        }
+
+        Settlement attackerSettlement = data.getSettlementByPlayer(player.getUUID());
+        if (attackerSettlement == null) {
+            return false;
+        }
+
+        if (attackerSettlement.getId().equals(targetSettlement.getId())) {
+            return false;
+        }
+
+        return WarService.isActiveSiegeBetween(
+                player.server,
+                attackerSettlement.getId(),
+                targetSettlement.getId()
+        );
+    }
+
+    private static boolean isHostileShopAccess(ServerPlayer player, BlockPos pos) {
+        if (!isShopBlock(player, pos)) {
+            return false;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+
+        Settlement targetSettlement = data.getSettlementByChunk(player.level(), new ChunkPos(pos));
+        if (targetSettlement == null) {
+            return false;
+        }
+
+        Settlement attackerSettlement = data.getSettlementByPlayer(player.getUUID());
+        if (attackerSettlement == null) {
+            return false;
+        }
+
+        if (attackerSettlement.getId().equals(targetSettlement.getId())) {
+            return false;
+        }
+
+        return WarService.isActiveSiegeBetween(
+                player.server,
+                attackerSettlement.getId(),
+                targetSettlement.getId()
+        );
+    }
+
+    private static boolean isShopBlock(ServerPlayer player, BlockPos pos) {
+        return player.level().getBlockState(pos).is(ModBlocks.SHOP_BLOCK.get());
+    }
+
+    private static boolean canAdminBypassShopBreak(ServerPlayer player) {
+        return player.hasPermissions(2) && player.isCreative();
     }
 
     private static ProtectedAction resolveAction(ServerPlayer player, BlockPos pos) {

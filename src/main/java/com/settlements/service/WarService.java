@@ -54,7 +54,13 @@ public final class WarService {
 
         SiegeState siege = data.getActiveSiegeForWar(war.getId());
         if (siege != null) {
-            endSiege(server, siege.getAttackerSettlementId(), siege.getDefenderSettlementId(), adminId, "Осада завершена заключением мира.");
+            endSiege(
+                    server,
+                    siege.getAttackerSettlementId(),
+                    siege.getDefenderSettlementId(),
+                    adminId,
+                    "Осада завершена заключением мира."
+            );
         }
 
         long gameTime = server.overworld().getGameTime();
@@ -107,7 +113,7 @@ public final class WarService {
 
         data.addOrUpdateSiege(siege);
 
-        // TODO: здесь будет вызов снимка для реконструкции.
+        // TODO:
         // SiegeSnapshotService.captureDefenderSnapshot(server, siege.getId(), defenderSettlementId);
 
         return siege;
@@ -130,7 +136,7 @@ public final class WarService {
         siege.close(gameTime, adminId, reason);
         data.addOrUpdateSiege(siege);
 
-        // TODO: здесь будет постосадное сравнение и создание ReconstructionSession.
+        // TODO:
         // SiegeSnapshotService.finalizeSiegeAndCreateReconstruction(server, siege.getId());
     }
 
@@ -157,6 +163,47 @@ public final class WarService {
     public static SiegeState getActiveSiege(MinecraftServer server, UUID attackerSettlementId, UUID defenderSettlementId) {
         SettlementSavedData data = SettlementSavedData.get(server);
         return data.getActiveSiege(attackerSettlementId, defenderSettlementId);
+    }
+
+    public static boolean isActiveSiegeBetween(
+            MinecraftServer server,
+            UUID attackerSettlementId,
+            UUID defenderSettlementId
+    ) {
+        if (server == null || attackerSettlementId == null || defenderSettlementId == null) {
+            return false;
+        }
+
+        if (attackerSettlementId.equals(defenderSettlementId)) {
+            return false;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(server);
+        return data.getActiveSiege(attackerSettlementId, defenderSettlementId) != null;
+    }
+
+    public static boolean canAttackerUseDoor(
+            MinecraftServer server,
+            UUID attackerSettlementId,
+            UUID defenderSettlementId
+    ) {
+        return isActiveSiegeBetween(server, attackerSettlementId, defenderSettlementId);
+    }
+
+    public static boolean canAttackerOpenContainer(
+            MinecraftServer server,
+            UUID attackerSettlementId,
+            UUID defenderSettlementId
+    ) {
+        return isActiveSiegeBetween(server, attackerSettlementId, defenderSettlementId);
+    }
+
+    public static boolean canAttackerBreakClaimedBlockByHand(
+            MinecraftServer server,
+            UUID attackerSettlementId,
+            UUID defenderSettlementId
+    ) {
+        return false;
     }
 
     private static Settlement requireSettlement(SettlementSavedData data, UUID settlementId) {
