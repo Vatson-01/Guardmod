@@ -4,6 +4,9 @@ import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementChunkClaim;
 import com.settlements.data.model.SettlementPlot;
 import com.settlements.data.model.ShopRecord;
+import com.settlements.data.model.SiegeState;
+import com.settlements.data.model.WarPairKey;
+import com.settlements.data.model.WarRecord;
 import com.settlements.util.BlockPosKeyUtil;
 import com.settlements.util.ClaimKeyUtil;
 import net.minecraft.core.BlockPos;
@@ -37,6 +40,14 @@ public class SettlementSavedData extends SavedData {
 
     private final Map<UUID, ShopRecord> shopsById = new LinkedHashMap<UUID, ShopRecord>();
     private final Map<String, UUID> shopIdByPosKey = new LinkedHashMap<String, UUID>();
+
+    private final Map<UUID, WarRecord> warsById = new LinkedHashMap<UUID, WarRecord>();
+    private final Map<WarPairKey, UUID> activeWarIdByPair = new LinkedHashMap<WarPairKey, UUID>();
+
+    private final Map<UUID, SiegeState> siegesById = new LinkedHashMap<UUID, SiegeState>();
+    private final Map<UUID, UUID> activeSiegeIdByWarId = new LinkedHashMap<UUID, UUID>();
+    private final Map<UUID, UUID> activeSiegeIdByDefenderSettlementId = new LinkedHashMap<UUID, UUID>();
+    private final Map<UUID, UUID> activeSiegeIdByAttackerSettlementId = new LinkedHashMap<UUID, UUID>();
 
     public SettlementSavedData() {
     }
@@ -87,6 +98,29 @@ public class SettlementSavedData extends SavedData {
             }
         }
 
+        if (tag.contains("Wars", Tag.TAG_LIST)) {
+            ListTag warList = tag.getList("Wars", Tag.TAG_COMPOUND);
+            for (int i = 0; i < warList.size(); i++) {
+                WarRecord war = WarRecord.load(warList.getCompound(i));
+                if (data.settlementsById.containsKey(war.getSettlementAId())
+                        && data.settlementsById.containsKey(war.getSettlementBId())) {
+                    data.warsById.put(war.getId(), war);
+                }
+            }
+        }
+
+        if (tag.contains("Sieges", Tag.TAG_LIST)) {
+            ListTag siegeList = tag.getList("Sieges", Tag.TAG_COMPOUND);
+            for (int i = 0; i < siegeList.size(); i++) {
+                SiegeState siege = SiegeState.load(siegeList.getCompound(i));
+                if (data.warsById.containsKey(siege.getWarId())
+                        && data.settlementsById.containsKey(siege.getAttackerSettlementId())
+                        && data.settlementsById.containsKey(siege.getDefenderSettlementId())) {
+                    data.siegesById.put(siege.getId(), siege);
+                }
+            }
+        }
+
         data.rebuildIndexes();
         return data;
     }
@@ -116,6 +150,18 @@ public class SettlementSavedData extends SavedData {
             plotsTag.add(plot.save());
         }
         tag.put("Plots", plotsTag);
+
+        ListTag warsTag = new ListTag();
+        for (WarRecord war : warsById.values()) {
+            warsTag.add(war.save());
+        }
+        tag.put("Wars", warsTag);
+
+        ListTag siegesTag = new ListTag();
+        for (SiegeState siege : siegesById.values()) {
+            siegesTag.add(siege.save());
+        }
+        tag.put("Sieges", siegesTag);
 
         ListTag shopsTag = new ListTag();
         for (ShopRecord shop : shopsById.values()) {
@@ -239,7 +285,12 @@ public class SettlementSavedData extends SavedData {
         }
 
         plotsById.entrySet().removeIf(entry -> entry.getValue().getSettlementId().equals(settlementId));
-        shopsById.entrySet().removeIf(entry -> entry.getValue().getSettlementId() != null && entry.getValue().getSettlementId().equals(settlementId));
+        shopsById.entrySet().removeIf(entry ->
+                entry.getValue().getSettlementId() != null
+                        && entry.getValue().getSettlementId().equals(settlementId));
+
+        warsById.entrySet().removeIf(entry -> entry.getValue().involvesSettlement(settlementId));
+        siegesById.entrySet().removeIf(entry -> entry.getValue().involvesSettlement(settlementId));
 
         rebuildIndexes();
         setDirty();
@@ -315,12 +366,107 @@ public class SettlementSavedData extends SavedData {
         setDirty();
     }
 
+    public Collection<WarRecord> getAllWars() {
+        return Collections.unmodifiableCollection(warsById.values());
+    }
+
+    public WarRecord getWar(UUID warId) {
+        return warsById.get(warId);
+    }
+
+    public List<WarRecord> getWarsForSettlement(UUID settlementId) {
+        List<WarRecord> result = new ArrayList<WarRecord>();
+        for (WarRecord war : warsById.values()) {
+            if (war.involvesSettlement(settlementId)) {
+                result.add(war);
+            }
+        }
+        return result;
+    }
+
+    public List<WarRecord> getActiveWarsForSettlement(UUID settlementId) {
+        List<WarRecord> result = new ArrayList<WarRecord>();
+        for (WarRecord war : warsById.values()) {
+            if (war.isActive() && war.involvesSettlement(settlementId)) {
+                result.add(war);
+            }
+        }
+        return result;
+    }
+
+    public WarRecord getActiveWar(UUID settlementAId, UUID settlementBId) {
+        if (settlementAId == null || settlementBId == null || settlementAId.equals(settlementBId)) {
+            return null;
+        }
+
+        UUID warId = activeWarIdByPair.get(WarPairKey.of(settlementAId, settlementBId));
+        return warId == null ? null : warsById.get(warId);
+    }
+
+    public Collection<SiegeState> getAllSieges() {
+        return Collections.unmodifiableCollection(siegesById.values());
+    }
+
+    public SiegeState getSiege(UUID siegeId) {
+        return siegesById.get(siegeId);
+    }
+
+    public List<SiegeState> getSiegesForSettlement(UUID settlementId) {
+        List<SiegeState> result = new ArrayList<SiegeState>();
+        for (SiegeState siege : siegesById.values()) {
+            if (siege.involvesSettlement(settlementId)) {
+                result.add(siege);
+            }
+        }
+        return result;
+    }
+
+    public SiegeState getActiveSiegeForWar(UUID warId) {
+        UUID siegeId = activeSiegeIdByWarId.get(warId);
+        return siegeId == null ? null : siegesById.get(siegeId);
+    }
+
+    public SiegeState getActiveSiegeForDefenderSettlement(UUID defenderSettlementId) {
+        UUID siegeId = activeSiegeIdByDefenderSettlementId.get(defenderSettlementId);
+        return siegeId == null ? null : siegesById.get(siegeId);
+    }
+
+    public SiegeState getActiveSiegeForAttackerSettlement(UUID attackerSettlementId) {
+        UUID siegeId = activeSiegeIdByAttackerSettlementId.get(attackerSettlementId);
+        return siegeId == null ? null : siegesById.get(siegeId);
+    }
+
+    public SiegeState getActiveSiege(UUID attackerSettlementId, UUID defenderSettlementId) {
+        SiegeState siege = getActiveSiegeForDefenderSettlement(defenderSettlementId);
+        if (siege == null) {
+            return null;
+        }
+        return siege.isDirection(attackerSettlementId, defenderSettlementId) ? siege : null;
+    }
+
+    public void addOrUpdateWar(WarRecord war) {
+        warsById.put(war.getId(), war);
+        rebuildIndexes();
+        setDirty();
+    }
+
+    public void addOrUpdateSiege(SiegeState siege) {
+        siegesById.put(siege.getId(), siege);
+        rebuildIndexes();
+        setDirty();
+    }
+
     private void rebuildIndexes() {
         settlementIdByNameLower.clear();
         settlementIdByPlayer.clear();
         plotIdByChunkKey.clear();
         plotIdByOwnerKey.clear();
         shopIdByPosKey.clear();
+
+        activeWarIdByPair.clear();
+        activeSiegeIdByWarId.clear();
+        activeSiegeIdByDefenderSettlementId.clear();
+        activeSiegeIdByAttackerSettlementId.clear();
 
         for (Settlement settlement : settlementsById.values()) {
             settlementIdByNameLower.put(settlement.getName().trim().toLowerCase(), settlement.getId());
@@ -337,6 +483,23 @@ public class SettlementSavedData extends SavedData {
 
         for (ShopRecord shop : shopsById.values()) {
             shopIdByPosKey.put(shop.getPosKey(), shop.getId());
+        }
+
+        for (WarRecord war : warsById.values()) {
+            if (war.isActive()) {
+                activeWarIdByPair.put(
+                        WarPairKey.of(war.getSettlementAId(), war.getSettlementBId()),
+                        war.getId()
+                );
+            }
+        }
+
+        for (SiegeState siege : siegesById.values()) {
+            if (siege.isActive()) {
+                activeSiegeIdByWarId.put(siege.getWarId(), siege.getId());
+                activeSiegeIdByDefenderSettlementId.put(siege.getDefenderSettlementId(), siege.getId());
+                activeSiegeIdByAttackerSettlementId.put(siege.getAttackerSettlementId(), siege.getId());
+            }
         }
     }
 

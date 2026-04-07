@@ -5,17 +5,20 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.settlements.SettlementsMod;
 import com.settlements.data.SettlementSavedData;
 import com.settlements.data.model.PlotPermission;
-import com.settlements.data.model.PriceMode;
-import com.settlements.service.ShopService;
 import com.settlements.data.model.PlotPermissionSet;
 import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementMember;
 import com.settlements.data.model.SettlementPlot;
 import com.settlements.data.model.ShopRecord;
 import com.settlements.data.model.ShopTradeEntry;
+import com.settlements.data.model.SiegeState;
+import com.settlements.data.model.WarRecord;
 import com.settlements.service.ClaimService;
 import com.settlements.service.CurrencyService;
 import com.settlements.service.PlotService;
@@ -23,6 +26,7 @@ import com.settlements.service.SettlementService;
 import com.settlements.service.ShopService;
 import com.settlements.service.TaxService;
 import com.settlements.service.TreasuryService;
+import com.settlements.service.WarService;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -34,8 +38,10 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 @Mod.EventBusSubscriber(modid = SettlementsMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
@@ -66,6 +72,8 @@ public final class SettlementDebugCommands {
                         .then(buildDisbandNode())
                         .then(buildAddMemberNode())
                         .then(buildRemoveMemberNode())
+                        .then(buildWarNode())
+                        .then(buildSiegeNode())
         );
     }
 
@@ -583,7 +591,6 @@ public final class SettlementDebugCommands {
                                             );
                                             return 1;
                                         }))))
-
                 .then(Commands.literal("rename")
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .executes(context -> {
@@ -767,6 +774,7 @@ public final class SettlementDebugCommands {
                                                                     );
                                                                     return 1;
                                                                 }))))))
+
                         .then(Commands.literal("dynamic")
                                 .then(Commands.argument("index", IntegerArgumentType.integer(1))
                                         .then(Commands.argument("baseSell", LongArgumentType.longArg(1L))
@@ -815,6 +823,7 @@ public final class SettlementDebugCommands {
                                                                                                                             );
                                                                                                                             return 1;
                                                                                                                         })))))))))))))
+
                         .then(Commands.literal("fixed")
                                 .then(Commands.argument("index", IntegerArgumentType.integer(1))
                                         .executes(context -> {
@@ -931,6 +940,373 @@ public final class SettlementDebugCommands {
                             );
                             return 1;
                         }));
+    }
+
+    private static CompletableFuture<Suggestions> suggestSettlementNames(
+            CommandContext<CommandSourceStack> context,
+            SuggestionsBuilder builder
+    ) {
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        return SharedSuggestionProvider.suggest(
+                data.getAllSettlements().stream().map(Settlement::getName),
+                builder
+        );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildWarNode() {
+        return Commands.literal("war")
+                .then(Commands.literal("start")
+                        .then(Commands.argument("settlementA", StringArgumentType.string())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .then(Commands.argument("settlementB", StringArgumentType.string())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> startWar(context, ""))
+                                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                                .executes(context -> startWar(
+                                                        context,
+                                                        StringArgumentType.getString(context, "reason")
+                                                )))
+                                )))
+                .then(Commands.literal("peace")
+                        .then(Commands.argument("settlementA", StringArgumentType.string())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .then(Commands.argument("settlementB", StringArgumentType.string())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> makePeace(context, ""))
+                                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                                .executes(context -> makePeace(
+                                                        context,
+                                                        StringArgumentType.getString(context, "reason")
+                                                )))
+                                )))
+                .then(Commands.literal("info")
+                        .then(Commands.argument("settlement", StringArgumentType.string())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .executes(SettlementDebugCommands::warInfo)));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildSiegeNode() {
+        return Commands.literal("siege")
+                .then(Commands.literal("start")
+                        .then(Commands.argument("attacker", StringArgumentType.string())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .then(Commands.argument("defender", StringArgumentType.string())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> startSiege(context, ""))
+                                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                                .executes(context -> startSiege(
+                                                        context,
+                                                        StringArgumentType.getString(context, "reason")
+                                                )))
+                                )))
+                .then(Commands.literal("end")
+                        .then(Commands.argument("attacker", StringArgumentType.string())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .then(Commands.argument("defender", StringArgumentType.string())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> endSiege(context, ""))
+                                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                                .executes(context -> endSiege(
+                                                        context,
+                                                        StringArgumentType.getString(context, "reason")
+                                                )))
+                                )))
+                .then(Commands.literal("info")
+                        .then(Commands.argument("settlement", StringArgumentType.string())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .executes(SettlementDebugCommands::siegeInfo)));
+    }
+
+    private static int startWar(CommandContext<CommandSourceStack> context, String reason) {
+        CommandSourceStack source = context.getSource();
+
+        String settlementAName = StringArgumentType.getString(context, "settlementA");
+        String settlementBName = StringArgumentType.getString(context, "settlementB");
+
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlementA = data.getSettlementByName(settlementAName);
+        Settlement settlementB = data.getSettlementByName(settlementBName);
+
+        if (settlementA == null) {
+            source.sendFailure(Component.literal("Поселение \"" + settlementAName + "\" не найдено."));
+            return 0;
+        }
+
+        if (settlementB == null) {
+            source.sendFailure(Component.literal("Поселение \"" + settlementBName + "\" не найдено."));
+            return 0;
+        }
+
+        try {
+            UUID adminId = source.getEntity() != null ? source.getEntity().getUUID() : null;
+
+            WarRecord war = WarService.startWar(
+                    source.getServer(),
+                    settlementA.getId(),
+                    settlementB.getId(),
+                    adminId,
+                    reason
+            );
+
+            source.sendSuccess(
+                    () -> Component.literal(
+                            "Война объявлена между поселениями \"" + settlementA.getName()
+                                    + "\" и \"" + settlementB.getName()
+                                    + "\". ID войны: " + war.getId()
+                    ),
+                    true
+            );
+
+            return 1;
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int makePeace(CommandContext<CommandSourceStack> context, String reason) {
+        CommandSourceStack source = context.getSource();
+
+        String settlementAName = StringArgumentType.getString(context, "settlementA");
+        String settlementBName = StringArgumentType.getString(context, "settlementB");
+
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlementA = data.getSettlementByName(settlementAName);
+        Settlement settlementB = data.getSettlementByName(settlementBName);
+
+        if (settlementA == null) {
+            source.sendFailure(Component.literal("Поселение \"" + settlementAName + "\" не найдено."));
+            return 0;
+        }
+
+        if (settlementB == null) {
+            source.sendFailure(Component.literal("Поселение \"" + settlementBName + "\" не найдено."));
+            return 0;
+        }
+
+        try {
+            UUID adminId = source.getEntity() != null ? source.getEntity().getUUID() : null;
+
+            WarService.makePeace(
+                    source.getServer(),
+                    settlementA.getId(),
+                    settlementB.getId(),
+                    adminId,
+                    reason
+            );
+
+            source.sendSuccess(
+                    () -> Component.literal(
+                            "Мир между поселениями \"" + settlementA.getName()
+                                    + "\" и \"" + settlementB.getName() + "\" заключен."
+                    ),
+                    true
+            );
+
+            return 1;
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int warInfo(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+
+        String settlementName = StringArgumentType.getString(context, "settlement");
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlement = data.getSettlementByName(settlementName);
+
+        if (settlement == null) {
+            source.sendFailure(Component.literal("Поселение \"" + settlementName + "\" не найдено."));
+            return 0;
+        }
+
+        List<WarRecord> activeWars = data.getActiveWarsForSettlement(settlement.getId());
+
+        if (activeWars.isEmpty()) {
+            source.sendSuccess(
+                    () -> Component.literal("У поселения \"" + settlement.getName() + "\" нет активных войн."),
+                    false
+            );
+            return 1;
+        }
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Активные войны поселения \"" + settlement.getName() + "\": " + activeWars.size()
+                ),
+                false
+        );
+
+        for (WarRecord war : activeWars) {
+            UUID otherId = war.getSettlementAId().equals(settlement.getId())
+                    ? war.getSettlementBId()
+                    : war.getSettlementAId();
+
+            Settlement otherSettlement = data.getSettlement(otherId);
+            String otherName = otherSettlement != null ? otherSettlement.getName() : otherId.toString();
+
+            source.sendSuccess(
+                    () -> Component.literal(
+                            "- Война с \"" + otherName + "\""
+                                    + ", начата в gameTime=" + war.getStartedAt()
+                                    + (war.getStartReason().isEmpty() ? "" : ", причина: " + war.getStartReason())
+                    ),
+                    false
+            );
+        }
+
+        return 1;
+    }
+
+    private static int startSiege(CommandContext<CommandSourceStack> context, String reason) {
+        CommandSourceStack source = context.getSource();
+
+        String attackerName = StringArgumentType.getString(context, "attacker");
+        String defenderName = StringArgumentType.getString(context, "defender");
+
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement attacker = data.getSettlementByName(attackerName);
+        Settlement defender = data.getSettlementByName(defenderName);
+
+        if (attacker == null) {
+            source.sendFailure(Component.literal("Поселение-атакующий \"" + attackerName + "\" не найдено."));
+            return 0;
+        }
+
+        if (defender == null) {
+            source.sendFailure(Component.literal("Поселение-защитник \"" + defenderName + "\" не найдено."));
+            return 0;
+        }
+
+        try {
+            UUID adminId = source.getEntity() != null ? source.getEntity().getUUID() : null;
+
+            SiegeState siege = WarService.startSiege(
+                    source.getServer(),
+                    attacker.getId(),
+                    defender.getId(),
+                    adminId,
+                    reason
+            );
+
+            source.sendSuccess(
+                    () -> Component.literal(
+                            "Осада начата: \"" + attacker.getName()
+                                    + "\" осаждает \"" + defender.getName()
+                                    + "\". ID осады: " + siege.getId()
+                    ),
+                    true
+            );
+
+            return 1;
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int endSiege(CommandContext<CommandSourceStack> context, String reason) {
+        CommandSourceStack source = context.getSource();
+
+        String attackerName = StringArgumentType.getString(context, "attacker");
+        String defenderName = StringArgumentType.getString(context, "defender");
+
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement attacker = data.getSettlementByName(attackerName);
+        Settlement defender = data.getSettlementByName(defenderName);
+
+        if (attacker == null) {
+            source.sendFailure(Component.literal("Поселение-атакующий \"" + attackerName + "\" не найдено."));
+            return 0;
+        }
+
+        if (defender == null) {
+            source.sendFailure(Component.literal("Поселение-защитник \"" + defenderName + "\" не найдено."));
+            return 0;
+        }
+
+        try {
+            UUID adminId = source.getEntity() != null ? source.getEntity().getUUID() : null;
+
+            WarService.endSiege(
+                    source.getServer(),
+                    attacker.getId(),
+                    defender.getId(),
+                    adminId,
+                    reason
+            );
+
+            source.sendSuccess(
+                    () -> Component.literal(
+                            "Осада завершена: \"" + attacker.getName()
+                                    + "\" больше не осаждает \"" + defender.getName() + "\"."
+                    ),
+                    true
+            );
+
+            return 1;
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int siegeInfo(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+
+        String settlementName = StringArgumentType.getString(context, "settlement");
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlement = data.getSettlementByName(settlementName);
+
+        if (settlement == null) {
+            source.sendFailure(Component.literal("Поселение \"" + settlementName + "\" не найдено."));
+            return 0;
+        }
+
+        SiegeState defendingSiege = data.getActiveSiegeForDefenderSettlement(settlement.getId());
+        SiegeState attackingSiege = data.getActiveSiegeForAttackerSettlement(settlement.getId());
+
+        if (defendingSiege == null && attackingSiege == null) {
+            source.sendSuccess(
+                    () -> Component.literal("Поселение \"" + settlement.getName() + "\" не участвует в активной осаде."),
+                    false
+            );
+            return 1;
+        }
+
+        if (defendingSiege != null) {
+            Settlement attacker = data.getSettlement(defendingSiege.getAttackerSettlementId());
+            String attackerName = attacker != null ? attacker.getName() : defendingSiege.getAttackerSettlementId().toString();
+
+            source.sendSuccess(
+                    () -> Component.literal(
+                            "Поселение \"" + settlement.getName()
+                                    + "\" сейчас находится в осаде. Атакующий: \"" + attackerName
+                                    + "\", начало осады: gameTime=" + defendingSiege.getStartedAt()
+                                    + (defendingSiege.getStartReason().isEmpty() ? "" : ", причина: " + defendingSiege.getStartReason())
+                    ),
+                    false
+            );
+        }
+
+        if (attackingSiege != null) {
+            Settlement defender = data.getSettlement(attackingSiege.getDefenderSettlementId());
+            String defenderName = defender != null ? defender.getName() : attackingSiege.getDefenderSettlementId().toString();
+
+            source.sendSuccess(
+                    () -> Component.literal(
+                            "Поселение \"" + settlement.getName()
+                                    + "\" сейчас ведет осаду. Защитник: \"" + defenderName
+                                    + "\", начало осады: gameTime=" + attackingSiege.getStartedAt()
+                                    + (attackingSiege.getStartReason().isEmpty() ? "" : ", причина: " + attackingSiege.getStartReason())
+                    ),
+                    false
+            );
+        }
+
+        return 1;
     }
 
     private static int sendSettlementInfo(CommandSourceStack source, UUID playerUuid) {
