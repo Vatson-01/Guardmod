@@ -206,6 +206,14 @@ public final class WarService {
         return false;
     }
 
+    public static boolean canAttackerBreakClaimedBlockByExplosion(
+            MinecraftServer server,
+            UUID attackerSettlementId,
+            UUID defenderSettlementId
+    ) {
+        return isActiveSiegeBetween(server, attackerSettlementId, defenderSettlementId);
+    }
+
     private static Settlement requireSettlement(SettlementSavedData data, UUID settlementId) {
         Settlement settlement = data.getSettlement(settlementId);
         if (settlement == null) {
