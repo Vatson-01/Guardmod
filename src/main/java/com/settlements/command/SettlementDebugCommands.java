@@ -29,6 +29,10 @@ import com.settlements.service.PlotService;
 import com.settlements.service.SettlementService;
 import com.settlements.service.ShopService;
 import com.settlements.service.TaxService;
+import com.settlements.data.model.ReconstructionBlockEntry;
+import com.settlements.data.model.ReconstructionSession;
+import com.settlements.service.ReconstructionRestoreResult;
+import com.settlements.service.ReconstructionService;
 import com.settlements.service.TreasuryService;
 import com.settlements.service.WarService;
 import net.minecraft.commands.CommandSourceStack;
@@ -99,12 +103,17 @@ public final class SettlementDebugCommands {
         return Commands.literal("reconstruction")
                 .then(Commands.literal("info")
                         .executes(SettlementDebugCommands::reconstructionInfo))
+                .then(Commands.literal("openstorage")
+                        .executes(SettlementDebugCommands::reconstructionOpenStorage))
                 .then(Commands.literal("deposithand")
                         .executes(SettlementDebugCommands::reconstructionDepositHand))
                 .then(Commands.literal("restore")
                         .executes(SettlementDebugCommands::reconstructionRestore))
                 .then(Commands.literal("skiplooked")
-                        .executes(SettlementDebugCommands::reconstructionSkipLooked));
+                        .executes(SettlementDebugCommands::reconstructionSkipLooked))
+                .then(Commands.literal("skipindex")
+                        .then(Commands.argument("index", IntegerArgumentType.integer(1))
+                                .executes(SettlementDebugCommands::reconstructionSkipIndex)));
     }
 
     private static int reconstructionInfo(CommandContext<CommandSourceStack> context) {
@@ -113,7 +122,7 @@ public final class SettlementDebugCommands {
         final ServerPlayer player;
         try {
             player = source.getPlayerOrException();
-        } catch (CommandSyntaxException e) {
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
             source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
             return 0;
         }
@@ -127,12 +136,67 @@ public final class SettlementDebugCommands {
             source.sendSuccess(() -> Component.literal("Siege ID: " + session.getSiegeId()), false);
             source.sendSuccess(() -> Component.literal("Snapshot ID: " + session.getSnapshotId()), false);
             source.sendSuccess(() -> Component.literal("Активна: " + session.isActive()), false);
-            source.sendSuccess(() -> Component.literal("Всего позиций: " + session.getEntries().size()), false);
+            source.sendSuccess(() -> Component.literal("Всего записей: " + session.getEntries().size()), false);
             source.sendSuccess(() -> Component.literal("Ожидает восстановления: " + session.countPendingEntries()), false);
             source.sendSuccess(() -> Component.literal("Восстановлено: " + session.countRestoredEntries()), false);
             source.sendSuccess(() -> Component.literal("Пропущено: " + session.countSkippedEntries()), false);
             source.sendSuccess(() -> Component.literal("Склад ресурсов: " + ReconstructionService.buildShortResourceSummary(session)), false);
 
+            int shown = 0;
+            for (int i = 0; i < session.getEntries().size(); i++) {
+                ReconstructionBlockEntry entry = session.getEntries().get(i);
+                if (!entry.isPending()) {
+                    continue;
+                }
+
+                final int index = i + 1;
+                final String itemId = entry.getRequiredItemId().isEmpty() ? "<без предмета>" : entry.getRequiredItemId();
+                final int requiredCount = entry.getRequiredCount();
+                final String posText = entry.getPos().toShortString();
+                final String dimText = entry.getDimensionId().toString();
+
+                source.sendSuccess(
+                        () -> Component.literal(
+                                "#" + index
+                                        + " item=" + itemId
+                                        + " x" + requiredCount
+                                        + " pos=" + posText
+                                        + " dim=" + dimText
+                        ),
+                        false
+                );
+
+                shown++;
+                if (shown >= 12) {
+                    break;
+                }
+            }
+
+            if (shown == 0) {
+                source.sendSuccess(() -> Component.literal("Нет ожидающих записей реконструкции."), false);
+            }
+
+            return 1;
+        } catch (IllegalStateException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int reconstructionOpenStorage(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+
+        final ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
+            return 0;
+        }
+
+        try {
+            ReconstructionService.openStorage(player);
+            source.sendSuccess(() -> Component.literal("Склад реконструкции открыт."), true);
             return 1;
         } catch (IllegalStateException ex) {
             source.sendFailure(Component.literal(ex.getMessage()));
@@ -146,7 +210,7 @@ public final class SettlementDebugCommands {
         final ServerPlayer player;
         try {
             player = source.getPlayerOrException();
-        } catch (CommandSyntaxException e) {
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
             source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
             return 0;
         }
@@ -170,15 +234,22 @@ public final class SettlementDebugCommands {
         final ServerPlayer player;
         try {
             player = source.getPlayerOrException();
-        } catch (CommandSyntaxException e) {
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
             source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
             return 0;
         }
 
         try {
-            int restored = ReconstructionService.restoreAvailable(player);
+            ReconstructionRestoreResult result = ReconstructionService.restoreAvailable(player);
             source.sendSuccess(
-                    () -> Component.literal("Восстановлено позиций: " + restored),
+                    () -> Component.literal(
+                            "Восстановлено: " + result.getRestored()
+                                    + ", не хватает ресурсов: " + result.getMissingResources()
+                                    + ", нет опоры: " + result.getBlockedBySupport()
+                                    + ", позиция занята: " + result.getOccupied()
+                                    + ", прочие блокировки: " + result.getOtherBlocked()
+                                    + ", осталось ожидать: " + result.getRemainingPending()
+                    ),
                     true
             );
             return 1;
@@ -194,7 +265,7 @@ public final class SettlementDebugCommands {
         final ServerPlayer player;
         try {
             player = source.getPlayerOrException();
-        } catch (CommandSyntaxException e) {
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
             source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
             return 0;
         }
@@ -203,6 +274,32 @@ public final class SettlementDebugCommands {
             ReconstructionService.skipLookedAtBlock(player);
             source.sendSuccess(
                     () -> Component.literal("Блок, на который ты смотришь, пропущен в реконструкции."),
+                    true
+            );
+            return 1;
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int reconstructionSkipIndex(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+
+        final ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
+            return 0;
+        }
+
+        int index = IntegerArgumentType.getInteger(context, "index");
+
+        try {
+            ReconstructionService.skipEntryByIndex(player, index);
+            source.sendSuccess(
+                    () -> Component.literal("Запись реконструкции #" + index + " пропущена."),
                     true
             );
             return 1;

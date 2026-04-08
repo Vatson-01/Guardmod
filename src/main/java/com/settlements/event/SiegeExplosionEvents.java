@@ -4,13 +4,9 @@ import com.settlements.SettlementsMod;
 import com.settlements.data.SettlementSavedData;
 import com.settlements.data.model.Settlement;
 import com.settlements.registry.ModBlocks;
+import com.settlements.service.MsmCompatService;
 import com.settlements.service.WarService;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.item.PrimedTnt;
-import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
@@ -20,6 +16,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = SettlementsMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
@@ -34,10 +31,17 @@ public final class SiegeExplosionEvents {
             return;
         }
 
+        Explosion explosion = event.getExplosion();
         SettlementSavedData data = SettlementSavedData.get(level.getServer());
-        UUID attackerSettlementId = resolveExplosionSettlementId(level, event.getExplosion(), data);
 
-        Iterator<BlockPos> iterator = event.getAffectedBlocks().iterator();
+        boolean isMsmExplosion = MsmCompatService.isMsmExplosion(explosion);
+        UUID attackerSettlementId = isMsmExplosion
+                ? MsmCompatService.resolveAttackerSettlementId(level, explosion)
+                : null;
+
+        List<BlockPos> affectedBlocks = event.getAffectedBlocks();
+        Iterator<BlockPos> iterator = affectedBlocks.iterator();
+
         while (iterator.hasNext()) {
             BlockPos pos = iterator.next();
             BlockState state = level.getBlockState(pos);
@@ -53,6 +57,11 @@ public final class SiegeExplosionEvents {
 
             Settlement defenderSettlement = data.getSettlementByChunk(level, new ChunkPos(pos));
             if (defenderSettlement == null) {
+                continue;
+            }
+
+            if (!isMsmExplosion) {
+                iterator.remove();
                 continue;
             }
 
@@ -74,51 +83,5 @@ public final class SiegeExplosionEvents {
                 iterator.remove();
             }
         }
-    }
-
-    private static UUID resolveExplosionSettlementId(Level level, Explosion explosion, SettlementSavedData data) {
-        if (explosion == null) {
-            return null;
-        }
-
-        LivingEntity indirect = explosion.getIndirectSourceEntity();
-        if (indirect instanceof ServerPlayer) {
-            ServerPlayer serverPlayer = (ServerPlayer) indirect;
-            Settlement settlement = data.getSettlementByPlayer(serverPlayer.getUUID());
-            return settlement == null ? null : settlement.getId();
-        }
-
-        Entity direct = explosion.getDirectSourceEntity();
-        if (direct == null) {
-            return null;
-        }
-
-        if (direct instanceof ServerPlayer) {
-            ServerPlayer serverPlayer = (ServerPlayer) direct;
-            Settlement settlement = data.getSettlementByPlayer(serverPlayer.getUUID());
-            return settlement == null ? null : settlement.getId();
-        }
-
-        if (direct instanceof Projectile) {
-            Projectile projectile = (Projectile) direct;
-            Entity owner = projectile.getOwner();
-            if (owner instanceof ServerPlayer) {
-                ServerPlayer serverPlayer = (ServerPlayer) owner;
-                Settlement settlement = data.getSettlementByPlayer(serverPlayer.getUUID());
-                return settlement == null ? null : settlement.getId();
-            }
-        }
-
-        if (direct instanceof PrimedTnt) {
-            PrimedTnt primedTnt = (PrimedTnt) direct;
-            LivingEntity owner = primedTnt.getOwner();
-            if (owner instanceof ServerPlayer) {
-                ServerPlayer serverPlayer = (ServerPlayer) owner;
-                Settlement settlement = data.getSettlementByPlayer(serverPlayer.getUUID());
-                return settlement == null ? null : settlement.getId();
-            }
-        }
-
-        return null;
     }
 }
