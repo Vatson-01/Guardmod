@@ -1016,17 +1016,14 @@ public class SettlementMenu extends AbstractContainerMenu {
             SettlementSavedData data = SettlementSavedData.get(serverPlayer.server);
             Settlement settlement = data.getSettlement(settlementId);
             SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
-
             SettlementMember selectedResident = null;
+
             if (settlement != null) {
                 int selectedIndex = menuData.get(DATA_SELECTED_RESIDENT_INDEX);
-                if (selectedIndex >= 0 && selectedIndex < residentViews.size()) {
-                    SettlementResidentView selectedView = residentViews.get(selectedIndex);
-                    try {
-                        UUID selectedUuid = UUID.fromString(selectedView.getPlayerUuid());
+                if (selectedIndex >= 0 && selectedIndex < residentOrder.size()) {
+                    UUID selectedUuid = residentOrder.get(selectedIndex);
+                    if (selectedUuid != null) {
                         selectedResident = settlement.getMember(selectedUuid);
-                    } catch (IllegalArgumentException ignored) {
-                        selectedResident = null;
                     }
                 }
             }
