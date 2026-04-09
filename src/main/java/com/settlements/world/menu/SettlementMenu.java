@@ -116,11 +116,15 @@ public class SettlementMenu extends AbstractContainerMenu {
     }
 
     public SettlementMenu(int containerId, Inventory playerInventory, UUID settlementId) {
+        this(containerId, playerInventory, createServerOpenData(playerInventory, settlementId));
+    }
+
+    private SettlementMenu(int containerId, Inventory playerInventory, OpenData openData) {
         this(
                 containerId,
                 playerInventory,
-                buildOpenData(playerInventory, settlementId),
-                createServerData(playerInventory, settlementId)
+                openData,
+                createServerData(playerInventory, openData)
         );
     }
 
@@ -141,6 +145,10 @@ public class SettlementMenu extends AbstractContainerMenu {
 
         this.addDataSlots(menuData);
         addPlayerInventorySlots(playerInventory);
+    }
+
+    private static OpenData createServerOpenData(Inventory playerInventory, UUID settlementId) {
+        return buildOpenData(playerInventory, settlementId);
     }
 
     public static void writeOpenData(FriendlyByteBuf buf, ServerPlayer player, UUID settlementId) {
@@ -296,7 +304,7 @@ public class SettlementMenu extends AbstractContainerMenu {
         return new SimpleContainerData(DATA_COUNT);
     }
 
-    private static ContainerData createServerData(final Inventory playerInventory, final UUID settlementId) {
+    private static ContainerData createServerData(final Inventory playerInventory, final OpenData openData) {
         return new ContainerData() {
             private int selectedTab = SettlementMenuTab.OVERVIEW.getIndex();
             private int residentPage = 0;
@@ -304,25 +312,19 @@ public class SettlementMenu extends AbstractContainerMenu {
             private int reconstructionPage = 0;
             private int selectedResidentIndex = 0;
 
-            private final List<UUID> residentOrder = createResidentOrder();
+            private final UUID settlementId = openData.settlementId;
+            private final List<UUID> residentOrder = createResidentOrderFromOpenData();
 
-            private List<UUID> createResidentOrder() {
+            private List<UUID> createResidentOrderFromOpenData() {
                 List<UUID> result = new ArrayList<UUID>();
 
-                if (!(playerInventory.player instanceof ServerPlayer)) {
-                    return result;
-                }
-
-                ServerPlayer serverPlayer = (ServerPlayer) playerInventory.player;
-                Settlement settlement = SettlementSavedData.get(serverPlayer.server).getSettlement(settlementId);
-                if (settlement == null) {
-                    return result;
-                }
-
-                List<SettlementMember> orderedMembers = SettlementMenu.getOrderedMembers(serverPlayer, settlement);
-                for (SettlementMember member : orderedMembers) {
-                    if (member != null && member.getPlayerUuid() != null) {
-                        result.add(member.getPlayerUuid());
+                for (SettlementResidentView residentView : openData.residentViews) {
+                    if (residentView == null) {
+                        continue;
+                    }
+                    try {
+                        result.add(UUID.fromString(residentView.getPlayerUuid()));
+                    } catch (IllegalArgumentException ignored) {
                     }
                 }
 
