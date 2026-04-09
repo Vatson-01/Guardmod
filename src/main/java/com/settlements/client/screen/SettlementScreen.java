@@ -65,7 +65,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         super(menu, inventory, title);
         this.imageWidth = 360;
         this.imageHeight = 262;
-        this.inventoryLabelY = 166;
+        this.inventoryLabelY = 170;
     }
 
     @Override
@@ -141,14 +141,15 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             addRenderableWidget(permissionButtons[i]);
         }
 
-        personalTaxMinus100Button = smallButton(left + 156, top + 96, "-100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_100));
-        personalTaxMinus10Button = smallButton(left + 205, top + 96, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_10));
-        personalTaxPlus10Button = smallButton(left + 254, top + 96, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_10));
-        personalTaxPlus100Button = smallButton(left + 303, top + 96, "+100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_100));
-        shopTaxMinus10Button = smallButton(left + 156, top + 132, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_10));
-        shopTaxMinus1Button = smallButton(left + 205, top + 132, "-1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_1));
-        shopTaxPlus1Button = smallButton(left + 254, top + 132, "+1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_1));
-        shopTaxPlus10Button = smallButton(left + 303, top + 132, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_10));
+        personalTaxMinus100Button = smallButton(left + 156, top + 114, "-100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_100));
+        personalTaxMinus10Button = smallButton(left + 205, top + 114, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_10));
+        personalTaxPlus10Button = smallButton(left + 254, top + 114, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_10));
+        personalTaxPlus100Button = smallButton(left + 303, top + 114, "+100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_100));
+
+        shopTaxMinus10Button = smallButton(left + 156, top + 140, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_10));
+        shopTaxMinus1Button = smallButton(left + 205, top + 140, "-1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_1));
+        shopTaxPlus1Button = smallButton(left + 254, top + 140, "+1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_1));
+        shopTaxPlus10Button = smallButton(left + 303, top + 140, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_10));
 
         addRenderableWidget(personalTaxMinus100Button);
         addRenderableWidget(personalTaxMinus10Button);
@@ -227,7 +228,12 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
     private void handleListRowClick(int row) {
         SettlementMenuTab tab = menu.getSelectedTab();
+
         if (tab == SettlementMenuTab.RESIDENTS) {
+            if (!menu.canAccessResidentsTab()) {
+                return;
+            }
+
             int index = residentPage * LIST_ROWS + row;
             if (index >= 0 && index < menu.getResidentViews().size()) {
                 pressButton(SettlementMenu.BUTTON_SELECT_RESIDENT_BASE + index);
@@ -251,9 +257,10 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             int index = reconstructionBlockPage * LIST_ROWS + row;
             if (index >= 0 && index < blocks.size()) {
                 SettlementReconstructionEntryView entry = blocks.get(index);
-                if (entry.isPending()) {
+                if (!entry.isRestored()) {
+                    boolean newSkipped = !entry.isSkipped();
                     pressButton(SettlementMenu.BUTTON_SKIP_RECON_ENTRY_BASE + entry.getIndex());
-                    menu.clientMarkReconstructionEntrySkipped(entry.getIndex());
+                    menu.clientSetReconstructionEntrySkipped(entry.getIndex(), newSkipped);
                 }
             }
         }
@@ -296,13 +303,18 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         reconstructionResourcePage = clampPage(reconstructionResourcePage, getReconstructionResourceMaxPage());
         reconstructionBlockPage = clampPage(reconstructionBlockPage, getReconstructionBlockMaxPage());
         permissionPage = clampPage(permissionPage, getPermissionMaxPage());
+
+        if (residentPanelMode == ResidentPanelMode.PERMISSIONS && !menu.canViewResidentPermissionPage()) {
+            residentPanelMode = ResidentPanelMode.TAXES;
+            permissionPage = 0;
+        }
     }
 
     private void updateButtons() {
         SettlementMenuTab selectedTab = menu.getSelectedTab();
 
         overviewTabButton.active = selectedTab != SettlementMenuTab.OVERVIEW;
-        residentsTabButton.active = selectedTab != SettlementMenuTab.RESIDENTS;
+        residentsTabButton.active = selectedTab != SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab();
         warTabButton.active = selectedTab != SettlementMenuTab.WAR;
         reconstructionTabButton.active = selectedTab != SettlementMenuTab.RECONSTRUCTION;
 
@@ -329,7 +341,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             listButtons[i].active = false;
         }
 
-        if (selectedTab == SettlementMenuTab.RESIDENTS) {
+        if (selectedTab == SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab()) {
             List<SettlementResidentView> residents = menu.getResidentViews();
             for (int row = 0; row < LIST_ROWS; row++) {
                 int index = residentPage * LIST_ROWS + row;
@@ -367,18 +379,20 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                     String prefix = entry.isSkipped() ? "[П] " : entry.isRestored() ? "[V] " : "[ ] ";
                     listButtons[row].setMessage(Component.literal(shorten(prefix + entry.getPositionText(), 20)));
                     listButtons[row].visible = true;
-                    listButtons[row].active = entry.isPending();
+                    listButtons[row].active = !entry.isRestored();
                 }
             }
         }
 
-        boolean residentsTab = selectedTab == SettlementMenuTab.RESIDENTS;
-        residentTaxesModeButton.visible = residentsTab;
-        residentPermissionsModeButton.visible = residentsTab;
-        residentTaxesModeButton.active = residentsTab && residentPanelMode != ResidentPanelMode.TAXES;
-        residentPermissionsModeButton.active = residentsTab && residentPanelMode != ResidentPanelMode.PERMISSIONS;
+        boolean residentsTab = selectedTab == SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab();
 
-        boolean permissionMode = residentsTab && residentPanelMode == ResidentPanelMode.PERMISSIONS;
+        residentTaxesModeButton.visible = residentsTab;
+        residentPermissionsModeButton.visible = residentsTab && menu.canViewResidentPermissionPage();
+
+        residentTaxesModeButton.active = residentsTab && residentPanelMode != ResidentPanelMode.TAXES;
+        residentPermissionsModeButton.active = residentsTab && menu.canViewResidentPermissionPage() && residentPanelMode != ResidentPanelMode.PERMISSIONS;
+
+        boolean permissionMode = residentsTab && residentPanelMode == ResidentPanelMode.PERMISSIONS && menu.canViewResidentPermissionPage();
         permissionPrevButton.visible = permissionMode;
         permissionNextButton.visible = permissionMode;
         permissionPrevButton.active = permissionMode && permissionPage > 0;
@@ -389,6 +403,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             permissionButtons[i].visible = false;
             permissionButtons[i].active = false;
         }
+
         if (permissionMode && menu.hasSelectedResident()) {
             SettlementPermission[] permissions = SettlementPermission.values();
             int start = permissionPage * PERMISSION_ROWS;
@@ -481,24 +496,39 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         }
 
         graphics.drawString(this.font, this.playerInventoryTitle, 8, this.inventoryLabelY, 0xFFFFFF, false);
-        if (tab != SettlementMenuTab.OVERVIEW) {
-            graphics.drawString(this.font, buildPageText(getCurrentPage(), getCurrentMaxPage()), 246, 38, 0xFFFFFF, false);
-        }
     }
 
     private void renderOverview(GuiGraphics graphics) {
         int x = 10;
         int y = 60;
+
         graphics.drawString(this.font, "Жителей: " + menu.getMemberCount(), x, y, 0xFFFFFF, false);
         y += 12;
         graphics.drawString(this.font, "Клеймов: " + menu.getClaimedChunkCount(), x, y, 0xFFFFFF, false);
         y += 12;
         graphics.drawString(this.font, "Лимит покупки: " + menu.getPurchasedChunkAllowance(), x, y, 0xFFFFFF, false);
         y += 12;
-        graphics.drawString(this.font, "Баланс казны: " + menu.getTreasuryBalance(), x, y, 0xA8FFA8, false);
+
+        graphics.drawString(
+                this.font,
+                menu.canViewTreasuryBalance() ? "Баланс казны: " + menu.getTreasuryBalance() : "Баланс казны: скрыт",
+                x,
+                y,
+                0xA8FFA8,
+                false
+        );
         y += 12;
-        graphics.drawString(this.font, "Долг поселения: " + menu.getSettlementDebt(), x, y, 0xFFB0B0, false);
+
+        graphics.drawString(
+                this.font,
+                menu.canViewSettlementDebt() ? "Долг поселения: " + menu.getSettlementDebt() : "Долг поселения: скрыт",
+                x,
+                y,
+                0xFFB0B0,
+                false
+        );
         y += 12;
+
         graphics.drawString(this.font, "Твой личный долг: " + menu.getPlayerDebt(), x, y, 0xFFD8A8, false);
         y += 12;
         graphics.drawString(this.font, "Активных войн: " + menu.getActiveWarCount(), x, y, 0xD0D0FF, false);
@@ -507,34 +537,43 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         String siegeStatus = menu.isUnderSiege()
                 ? "Поселение в осаде"
                 : menu.isAttackingSiege() ? "Поселение осаждает врага" : "Осад нет";
-        graphics.drawString(this.font, shorten(siegeStatus, 40), x, y, 0xFFDDAA, false);
+        graphics.drawString(this.font, shorten(siegeStatus, 34), x, y, 0xFFDDAA, false);
         y += 12;
+
         graphics.drawString(this.font, "Реконструкция: " + (menu.hasActiveReconstruction() ? "активна" : "нет"), x, y, 0xE0E0E0, false);
-        if (menu.hasActiveReconstruction()) {
-            graphics.drawString(this.font, "Ожидает блоков: " + menu.getReconstructionPending(), 170, 60, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Восстановлено: " + menu.getReconstructionRestored(), 170, 72, 0xA8FFA8, false);
-            graphics.drawString(this.font, "Пропущено: " + menu.getReconstructionSkipped(), 170, 84, 0xFFD8A8, false);
-        }
     }
 
     private void renderResidents(GuiGraphics graphics) {
-        graphics.drawString(this.font, "Жители", 12, 58, 0xFFFFFF, false);
+        graphics.drawString(this.font, buildPageText(getCurrentPage(), getCurrentMaxPage()), 292, 58, 0xFFFFFF, false);
 
-        SettlementResidentView selected = menu.getResidentViewByIndex(menu.getSelectedResidentIndex());
-        String selectedName = selected == null ? "Никого" : selected.getDisplayName();
-        graphics.drawString(this.font, shorten(selectedName, 24), 140, 38, selected != null && selected.isLeader() ? 0xFFFF88 : 0xFFFFFF, false);
-
-        if (selected == null || !menu.hasSelectedResident()) {
-            graphics.drawString(this.font, "Выбери жителя слева.", 140, 82, 0xDDDDDD, false);
+        if (!menu.canAccessResidentsTab()) {
+            graphics.drawString(this.font, "Нет права просматривать жителей.", 140, 84, 0xFFB0B0, false);
             return;
         }
 
+        SettlementResidentView selected = menu.getResidentViewByIndex(menu.getSelectedResidentIndex());
+        if (selected == null || !menu.hasSelectedResident()) {
+            graphics.drawString(this.font, "Выбери жителя слева.", 140, 84, 0xDDDDDD, false);
+            return;
+        }
+
+        graphics.drawString(this.font, "Выбран: " + shorten(selected.getDisplayName(), 18), 140, 78, selected.isLeader() ? 0xFFFF88 : 0xFFFFFF, false);
+
         if (residentPanelMode == ResidentPanelMode.TAXES) {
-            graphics.drawString(this.font, "UUID: " + shorten(selected.getPlayerUuid(), 22), 140, 78, 0xC8C8C8, false);
-            graphics.drawString(this.font, "Личный долг: " + menu.getSelectedResidentPersonalDebt(), 140, 90, 0xFFD8A8, false);
-            graphics.drawString(this.font, "Личный налог: " + menu.getSelectedResidentPersonalTaxAmount(), 140, 108, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Налог магазинов: " + menu.getSelectedResidentShopTaxPercent() + "%", 140, 144, 0xFFFFFF, false);
+            graphics.drawString(this.font, "UUID: " + shorten(selected.getPlayerUuid(), 22), 140, 90, 0xC8C8C8, false);
+
+            String debtText = menu.canViewSelectedResidentDebt()
+                    ? String.valueOf(menu.getSelectedResidentPersonalDebt())
+                    : "скрыт";
+            graphics.drawString(this.font, "Личный долг: " + debtText, 140, 102, 0xFFD8A8, false);
+            graphics.drawString(this.font, "Личный налог: " + menu.getSelectedResidentPersonalTaxAmount(), 140, 114, 0xFFFFFF, false);
+            graphics.drawString(this.font, "Налог магазинов: " + menu.getSelectedResidentShopTaxPercent() + "%", 140, 140, 0xFFFFFF, false);
         } else {
+            if (!menu.canViewResidentPermissionPage()) {
+                graphics.drawString(this.font, "Нет права смотреть права жителей.", 140, 84, 0xFFB0B0, false);
+                return;
+            }
+
             SettlementPermission[] permissions = SettlementPermission.values();
             int start = permissionPage * PERMISSION_ROWS;
             for (int row = 0; row < PERMISSION_ROWS; row++) {
@@ -552,6 +591,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
     private void renderWar(GuiGraphics graphics) {
         graphics.drawString(this.font, "Активные войны", 12, 58, 0xFFFFFF, false);
+        graphics.drawString(this.font, buildPageText(getCurrentPage(), getCurrentMaxPage()), 278, 58, 0xFFFFFF, false);
+
         List<SettlementWarView> wars = menu.getWarViews();
         if (wars.isEmpty()) {
             graphics.drawString(this.font, "Активных войн нет.", 12, 74, 0xDDDDDD, false);
@@ -571,41 +612,42 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     }
 
     private void renderReconstruction(GuiGraphics graphics) {
-        graphics.drawString(this.font, "Всего: " + menu.getReconstructionTotal(), 12, 38, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Ожидает: " + menu.getReconstructionPending(), 82, 38, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Восстановлено: " + menu.getReconstructionRestored(), 152, 38, 0xA8FFA8, false);
-        graphics.drawString(this.font, "Пропущено: " + menu.getReconstructionSkipped(), 250, 38, 0xFFD8A8, false);
         graphics.drawString(this.font, reconstructionPanelMode == ReconstructionPanelMode.RESOURCES ? "Ресурсы" : "Блоки", 12, 58, 0xFFFFFF, false);
+        graphics.drawString(this.font, buildPageText(getCurrentPage(), getCurrentMaxPage()), 292, 58, 0xFFFFFF, false);
 
         if (!menu.hasActiveReconstruction()) {
-            graphics.drawString(this.font, "Активной реконструкции нет.", 140, 132, 0xDDDDDD, false);
+            graphics.drawString(this.font, "Активной реконструкции нет.", 140, 128, 0xDDDDDD, false);
             return;
         }
+
+        graphics.drawString(this.font, "Всего: " + menu.getReconstructionTotal(), 140, 128, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Ожидает: " + menu.getReconstructionPending(), 140, 140, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Восстановлено: " + menu.getReconstructionRestored(), 240, 128, 0xA8FFA8, false);
+        graphics.drawString(this.font, "Пропущено: " + menu.getReconstructionSkipped(), 240, 140, 0xFFD8A8, false);
 
         if (reconstructionPanelMode == ReconstructionPanelMode.RESOURCES) {
             ReconstructionResourceSummary selectedSummary = getSelectedResourceSummary();
             if (selectedSummary == null) {
-                graphics.drawString(this.font, "Выбери ресурс слева.", 140, 132, 0xDDDDDD, false);
+                graphics.drawString(this.font, "Выбери ресурс слева.", 140, 154, 0xDDDDDD, false);
                 return;
             }
-            graphics.drawString(this.font, shorten(selectedSummary.displayName, 24), 140, 128, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Всего нужно: " + selectedSummary.totalCount, 140, 142, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Ожидает: " + selectedSummary.pendingCount, 140, 154, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Восстановлено: " + selectedSummary.restoredCount, 240, 142, 0xA8FFA8, false);
-            graphics.drawString(this.font, "Пропущено: " + selectedSummary.skippedCount, 240, 154, 0xFFD8A8, false);
+            graphics.drawString(this.font, shorten(selectedSummary.displayName, 24), 140, 154, 0xFFFFFF, false);
+            graphics.drawString(this.font, "Всего нужно: " + selectedSummary.totalCount, 140, 166, 0xFFFFFF, false);
         } else {
             List<SettlementReconstructionEntryView> blocks = getVisibleReconstructionBlocks();
-            graphics.drawString(this.font, selectedResourceKey == null ? "Ресурс не выбран" : shorten(selectedResourceKey, 24), 140, 128, 0xFFFFFF, false);
+            graphics.drawString(this.font, selectedResourceKey == null ? "Ресурс не выбран" : shorten(selectedResourceKey, 24), 140, 154, 0xFFFFFF, false);
             if (blocks.isEmpty()) {
-                graphics.drawString(this.font, "Нет блоков для выбранного ресурса.", 140, 144, 0xDDDDDD, false);
+                graphics.drawString(this.font, "Нет блоков для выбранного ресурса.", 140, 166, 0xDDDDDD, false);
                 return;
             }
+
             int previewStart = reconstructionBlockPage * LIST_ROWS;
             if (previewStart < blocks.size()) {
                 SettlementReconstructionEntryView entry = blocks.get(previewStart);
                 String status = entry.isRestored() ? "восстановлен" : entry.isSkipped() ? "пропущен" : "ожидает";
-                graphics.drawString(this.font, "Статус: " + status, 140, 144, entry.isPending() ? 0xFFFFFF : entry.isSkipped() ? 0xFFD8A8 : 0xA8FFA8, false);
-                graphics.drawString(this.font, shorten(entry.getDimensionText(), 24), 140, 156, 0xC8C8C8, false);
+                int color = entry.isRestored() ? 0xA8FFA8 : entry.isSkipped() ? 0xFFD8A8 : 0xFFFFFF;
+                graphics.drawString(this.font, "Статус: " + status, 140, 166, color, false);
+                graphics.drawString(this.font, shorten(entry.getDimensionText(), 24), 140, 178, 0xC8C8C8, false);
             }
         }
     }

@@ -6,6 +6,7 @@ import com.settlements.data.model.ReconstructionSession;
 import com.settlements.data.model.Settlement;
 import com.settlements.world.menu.ReconstructionStorageContainer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -229,13 +230,12 @@ public final class ReconstructionService {
             throw new IllegalStateException("Эта запись уже восстановлена.");
         }
 
-        if (entry.isSkipped()) {
-            throw new IllegalStateException("Эта запись уже пропущена.");
-        }
+        boolean newSkipped = !entry.isSkipped();
+        entry.setSkipped(newSkipped);
 
-        entry.setSkipped(true);
-
-        if (session.countPendingEntries() <= 0) {
+        if (!newSkipped) {
+            session.setActive(true);
+        } else if (session.countPendingEntries() <= 0) {
             session.setActive(false);
         }
 

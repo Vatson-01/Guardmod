@@ -7,6 +7,7 @@ import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementMember;
 import com.settlements.data.model.SettlementPermission;
 import com.settlements.data.model.SiegeState;
+import java.util.Comparator;
 import com.settlements.data.model.WarRecord;
 import com.settlements.registry.ModMenuTypes;
 import com.settlements.service.ReconstructionRestoreResult;
@@ -90,7 +91,12 @@ public class SettlementMenu extends AbstractContainerMenu {
     private static final int DATA_CAN_EDIT_SELECTED_RESIDENT_PERSONAL_TAX = 35;
     private static final int DATA_CAN_EDIT_SELECTED_RESIDENT_SHOP_TAX = 36;
     private static final int DATA_CAN_STOP_RECONSTRUCTION = 37;
-    private static final int DATA_COUNT = 38;
+    private static final int DATA_CAN_ACCESS_RESIDENTS_TAB = 38;
+    private static final int DATA_CAN_VIEW_RESIDENT_PERMISSION_PAGE = 39;
+    private static final int DATA_CAN_VIEW_TREASURY = 40;
+    private static final int DATA_CAN_VIEW_SETTLEMENT_DEBT = 41;
+    private static final int DATA_CAN_VIEW_SELECTED_RESIDENT_DEBT = 42;
+    private static final int DATA_COUNT = 43;
 
     private final UUID settlementId;
     private final String settlementName;
@@ -158,7 +164,7 @@ public class SettlementMenu extends AbstractContainerMenu {
         String leaderName = resolvePlayerName(serverPlayer, settlement.getLeaderUuid());
 
         List<SettlementResidentView> residentViews = new ArrayList<SettlementResidentView>();
-        for (SettlementMember member : settlement.getMembers()) {
+        for (SettlementMember member : getOrderedMembers(serverPlayer, settlement)) {
             String displayName = resolvePlayerName(serverPlayer, member.getPlayerUuid());
             residentViews.add(new SettlementResidentView(
                     displayName,
@@ -236,6 +242,40 @@ public class SettlementMenu extends AbstractContainerMenu {
 
         return playerUuid.toString();
     }
+    private static List<SettlementMember> getOrderedMembers(final ServerPlayer viewer, Settlement settlement) {
+        List<SettlementMember> ordered = new ArrayList<SettlementMember>();
+        if (settlement == null) {
+            return ordered;
+        }
+
+        ordered.addAll(settlement.getMembers());
+        Collections.sort(ordered, new Comparator<SettlementMember>() {
+            @Override
+            public int compare(SettlementMember first, SettlementMember second) {
+                if (first == second) {
+                    return 0;
+                }
+                if (first == null) {
+                    return 1;
+                }
+                if (second == null) {
+                    return -1;
+                }
+                if (first.isLeader() != second.isLeader()) {
+                    return first.isLeader() ? -1 : 1;
+                }
+
+                String firstName = resolvePlayerName(viewer, first.getPlayerUuid());
+                String secondName = resolvePlayerName(viewer, second.getPlayerUuid());
+                int byName = firstName.compareToIgnoreCase(secondName);
+                if (byName != 0) {
+                    return byName;
+                }
+                return first.getPlayerUuid().toString().compareTo(second.getPlayerUuid().toString());
+            }
+        });
+        return ordered;
+    }
 
     private static long encodePermissionMask(SettlementMember member) {
         if (member == null) {
@@ -294,24 +334,48 @@ public class SettlementMenu extends AbstractContainerMenu {
                 ServerPlayer serverPlayer = (ServerPlayer) playerInventory.player;
                 return SettlementSavedData.get(serverPlayer.server).getActiveWarsForSettlement(settlementId);
             }
-
-            private SettlementMember getSelectedResident(Settlement settlement) {
+            private List<SettlementMember> getOrderedMembers(Settlement settlement) {
                 if (settlement == null) {
-                    return null;
+                    return Collections.emptyList();
                 }
 
-                if (selectedResidentIndex < 0 || selectedResidentIndex >= settlement.getMembers().size()) {
+                List<SettlementMember> ordered = new ArrayList<SettlementMember>(settlement.getMembers());
+                if (playerInventory.player instanceof ServerPlayer) {
+                    final ServerPlayer serverPlayer = (ServerPlayer) playerInventory.player;
+                    Collections.sort(ordered, new Comparator<SettlementMember>() {
+                        @Override
+                        public int compare(SettlementMember first, SettlementMember second) {
+                            if (first == second) {
+                                return 0;
+                            }
+                            if (first == null) {
+                                return 1;
+                            }
+                            if (second == null) {
+                                return -1;
+                            }
+                            if (first.isLeader() != second.isLeader()) {
+                                return first.isLeader() ? -1 : 1;
+                            }
+
+                            String firstName = resolvePlayerName(serverPlayer, first.getPlayerUuid());
+                            String secondName = resolvePlayerName(serverPlayer, second.getPlayerUuid());
+                            int byName = firstName.compareToIgnoreCase(secondName);
+                            if (byName != 0) {
+                                return byName;
+                            }
+                            return first.getPlayerUuid().toString().compareTo(second.getPlayerUuid().toString());
+                        }
+                    });
+                }
+                return ordered;
+            }
+            private SettlementMember getSelectedResident(Settlement settlement) {
+                List<SettlementMember> ordered = getOrderedMembers(settlement);
+                if (selectedResidentIndex < 0 || selectedResidentIndex >= ordered.size()) {
                     return null;
                 }
-
-                int current = 0;
-                for (SettlementMember member : settlement.getMembers()) {
-                    if (current == selectedResidentIndex) {
-                        return member;
-                    }
-                    current++;
-                }
-                return null;
+                return ordered.get(selectedResidentIndex);
             }
 
             private boolean canEditSelectedResidentPermissions(Settlement settlement, SettlementMember self, SettlementMember target) {
@@ -348,6 +412,75 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return settlement != null
                         && reconstruction != null
                         && settlement.isLeader(playerInventory.player.getUUID());
+            }
+
+            private boolean isLeader(Settlement settlement) {
+                return settlement != null && settlement.isLeader(playerInventory.player.getUUID());
+            }
+
+            private boolean hasNamedPermission(Settlement settlement, SettlementMember member, String permissionName) {
+                if (permissionName == null || permissionName.isEmpty()) {
+                    return false;
+                }
+                if (isLeader(settlement)) {
+                    return true;
+                }
+                if (member == null) {
+                    return false;
+                }
+                for (SettlementPermission permission : SettlementPermission.values()) {
+                    if (permissionName.equals(permission.name()) && member.getPermissionSet().has(permission)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            private boolean hasPermission(Settlement settlement, SettlementMember member, SettlementPermission permission) {
+                if (permission == null) {
+                    return false;
+                }
+                if (isLeader(settlement)) {
+                    return true;
+                }
+                return member != null && member.getPermissionSet().has(permission);
+            }
+
+            private boolean canAccessResidentsTab(Settlement settlement, SettlementMember self) {
+                return hasPermission(settlement, self, SettlementPermission.VIEW_RESIDENTS)
+                        || hasPermission(settlement, self, SettlementPermission.GRANT_PERMISSIONS)
+                        || hasPermission(settlement, self, SettlementPermission.CHANGE_PLAYER_TAX)
+                        || hasPermission(settlement, self, SettlementPermission.CHANGE_PLAYER_SHOP_TAX)
+                        || hasNamedPermission(settlement, self, "VIEW_RESIDENT_PERMISSIONS");
+            }
+
+            private boolean canViewResidentPermissionPage(Settlement settlement, SettlementMember self) {
+                return hasPermission(settlement, self, SettlementPermission.GRANT_PERMISSIONS)
+                        || hasNamedPermission(settlement, self, "VIEW_RESIDENT_PERMISSIONS");
+            }
+
+            private boolean canViewTreasuryBalance(Settlement settlement, SettlementMember self) {
+                return hasNamedPermission(settlement, self, "VIEW_TREASURY_BALANCE");
+            }
+
+            private boolean canViewSettlementDebt(Settlement settlement, SettlementMember self) {
+                return hasNamedPermission(settlement, self, "VIEW_SETTLEMENT_DEBT");
+            }
+
+            private boolean canViewSelectedResidentDebt(Settlement settlement, SettlementMember self, SettlementMember target) {
+                if (target == null) {
+                    return false;
+                }
+                if (isLeader(settlement)) {
+                    return true;
+                }
+                if (playerInventory.player.getUUID().equals(target.getPlayerUuid())) {
+                    return true;
+                }
+                if (canEditSelectedResidentPersonalTax(settlement, self, target)) {
+                    return true;
+                }
+                return hasNamedPermission(settlement, self, "VIEW_PLAYER_DEBTS");
             }
 
             @Override
@@ -489,6 +622,21 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
                 if (index == DATA_CAN_STOP_RECONSTRUCTION) {
                     return canStopReconstruction(settlement, reconstruction) ? 1 : 0;
+                }
+                if (index == DATA_CAN_ACCESS_RESIDENTS_TAB) {
+                    return canAccessResidentsTab(settlement, self) ? 1 : 0;
+                }
+                if (index == DATA_CAN_VIEW_RESIDENT_PERMISSION_PAGE) {
+                    return canViewResidentPermissionPage(settlement, self) ? 1 : 0;
+                }
+                if (index == DATA_CAN_VIEW_TREASURY) {
+                    return canViewTreasuryBalance(settlement, self) ? 1 : 0;
+                }
+                if (index == DATA_CAN_VIEW_SETTLEMENT_DEBT) {
+                    return canViewSettlementDebt(settlement, self) ? 1 : 0;
+                }
+                if (index == DATA_CAN_VIEW_SELECTED_RESIDENT_DEBT) {
+                    return canViewSelectedResidentDebt(settlement, self, selectedResident) ? 1 : 0;
                 }
 
                 return 0;
@@ -742,6 +890,26 @@ public class SettlementMenu extends AbstractContainerMenu {
         return menuData.get(DATA_CAN_STOP_RECONSTRUCTION) != 0;
     }
 
+    public boolean canAccessResidentsTab() {
+        return menuData.get(DATA_CAN_ACCESS_RESIDENTS_TAB) != 0;
+    }
+
+    public boolean canViewResidentPermissionPage() {
+        return menuData.get(DATA_CAN_VIEW_RESIDENT_PERMISSION_PAGE) != 0;
+    }
+
+    public boolean canViewTreasuryBalance() {
+        return menuData.get(DATA_CAN_VIEW_TREASURY) != 0;
+    }
+
+    public boolean canViewSettlementDebt() {
+        return menuData.get(DATA_CAN_VIEW_SETTLEMENT_DEBT) != 0;
+    }
+
+    public boolean canViewSelectedResidentDebt() {
+        return menuData.get(DATA_CAN_VIEW_SELECTED_RESIDENT_DEBT) != 0;
+    }
+
     public SettlementResidentView getResidentViewByIndex(int index) {
         if (index < 0 || index >= residentViews.size()) {
             return null;
@@ -749,14 +917,18 @@ public class SettlementMenu extends AbstractContainerMenu {
         return residentViews.get(index);
     }
 
-    public void clientMarkReconstructionEntrySkipped(int oneBasedIndex) {
+    public void clientSetReconstructionEntrySkipped(int oneBasedIndex, boolean skipped) {
         for (int i = 0; i < reconstructionViews.size(); i++) {
             SettlementReconstructionEntryView view = reconstructionViews.get(i);
             if (view.getIndex() == oneBasedIndex) {
-                reconstructionViews.set(i, view.withSkipped(true));
+                reconstructionViews.set(i, view.withSkipped(skipped));
                 return;
             }
         }
+    }
+
+    public void clientMarkReconstructionEntrySkipped(int oneBasedIndex) {
+        clientSetReconstructionEntrySkipped(oneBasedIndex, true);
     }
 
     @Override
@@ -766,6 +938,9 @@ public class SettlementMenu extends AbstractContainerMenu {
             return true;
         }
         if (buttonId == BUTTON_TAB_RESIDENTS) {
+            if (!canAccessResidentsTab()) {
+                return false;
+            }
             menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.RESIDENTS.getIndex());
             return true;
         }
@@ -789,6 +964,9 @@ public class SettlementMenu extends AbstractContainerMenu {
         }
 
         if (buttonId >= BUTTON_SELECT_RESIDENT_BASE && buttonId < BUTTON_TOGGLE_SELECTED_PERMISSION_BASE) {
+            if (!canAccessResidentsTab()) {
+                return false;
+            }
             menuData.set(DATA_SELECTED_RESIDENT_INDEX, buttonId - BUTTON_SELECT_RESIDENT_BASE);
             return true;
         }
@@ -805,14 +983,10 @@ public class SettlementMenu extends AbstractContainerMenu {
             SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
             SettlementMember selectedResident = null;
             if (settlement != null) {
+                List<SettlementMember> orderedResidents = getOrderedMembers(serverPlayer, settlement);
                 int selectedResidentIndex = menuData.get(DATA_SELECTED_RESIDENT_INDEX);
-                int current = 0;
-                for (SettlementMember member : settlement.getMembers()) {
-                    if (current == selectedResidentIndex) {
-                        selectedResident = member;
-                        break;
-                    }
-                    current++;
+                if (selectedResidentIndex >= 0 && selectedResidentIndex < orderedResidents.size()) {
+                    selectedResident = orderedResidents.get(selectedResidentIndex);
                 }
             }
 
