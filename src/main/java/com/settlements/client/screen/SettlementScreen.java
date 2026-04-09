@@ -421,10 +421,11 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 SettlementPermission permission = permissions[index];
                 visiblePermissionOrdinals[row] = permission.ordinal();
                 permissionButtons[row].visible = true;
-                permissionButtons[row].active = menu.canEditSelectedResidentPermissions();
+                permissionButtons[row].active = !menu.isSelectedResidentLeader();
                 permissionButtons[row].setMessage(Component.literal(menu.selectedResidentHasPermission(permission) ? "Вкл" : "Выкл"));
             }
         }
+
 
         boolean taxesMode = residentsTab && residentPanelMode == ResidentPanelMode.TAXES;
         personalTaxMinus100Button.visible = taxesMode;
@@ -436,8 +437,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         shopTaxPlus1Button.visible = taxesMode;
         shopTaxPlus10Button.visible = taxesMode;
 
-        boolean allowPersonalTaxButtons = taxesMode && menu.canEditSelectedResidentPersonalTax();
-        boolean allowShopTaxButtons = taxesMode && menu.canEditSelectedResidentShopTax();
+        boolean allowPersonalTaxButtons = taxesMode && menu.hasSelectedResident() && !menu.isSelectedResidentLeader();
+        boolean allowShopTaxButtons = taxesMode && menu.hasSelectedResident() && !menu.isSelectedResidentLeader();
 
         personalTaxMinus100Button.active = allowPersonalTaxButtons;
         personalTaxMinus10Button.active = allowPersonalTaxButtons;
