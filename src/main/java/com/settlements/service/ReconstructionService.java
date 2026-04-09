@@ -6,7 +6,6 @@ import com.settlements.data.model.ReconstructionSession;
 import com.settlements.data.model.Settlement;
 import com.settlements.world.menu.ReconstructionStorageContainer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -64,6 +63,26 @@ public final class ReconstructionService {
                 (containerId, playerInventory, ignoredPlayer) -> ChestMenu.sixRows(containerId, playerInventory, container),
                 Component.literal("Склад реконструкции")
         ));
+    }
+
+
+    public static void stopActive(ServerPlayer player) {
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+        Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+        if (settlement == null) {
+            throw new IllegalStateException("Игрок не состоит в поселении.");
+        }
+        if (!settlement.isLeader(player.getUUID())) {
+            throw new IllegalStateException("Только глава поселения может принудительно остановить реконструкцию.");
+        }
+
+        ReconstructionSession session = data.getActiveReconstructionForSettlement(settlement.getId());
+        if (session == null) {
+            throw new IllegalStateException("У поселения нет активной реконструкции.");
+        }
+
+        session.setActive(false);
+        data.addOrUpdateReconstruction(session);
     }
 
     public static int depositMainHand(ServerPlayer player) {

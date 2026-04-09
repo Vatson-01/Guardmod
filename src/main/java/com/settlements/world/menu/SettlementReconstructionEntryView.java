@@ -8,19 +8,25 @@ public class SettlementReconstructionEntryView {
     private final int requiredCount;
     private final String positionText;
     private final String dimensionText;
+    private final boolean skipped;
+    private final boolean restored;
 
     public SettlementReconstructionEntryView(
             int index,
             String requiredItemId,
             int requiredCount,
             String positionText,
-            String dimensionText
+            String dimensionText,
+            boolean skipped,
+            boolean restored
     ) {
         this.index = index;
         this.requiredItemId = requiredItemId;
         this.requiredCount = requiredCount;
         this.positionText = positionText;
         this.dimensionText = dimensionText;
+        this.skipped = skipped;
+        this.restored = restored;
     }
 
     public int getIndex() {
@@ -43,12 +49,38 @@ public class SettlementReconstructionEntryView {
         return dimensionText;
     }
 
+    public boolean isSkipped() {
+        return skipped;
+    }
+
+    public boolean isRestored() {
+        return restored;
+    }
+
+    public boolean isPending() {
+        return !skipped && !restored;
+    }
+
+    public SettlementReconstructionEntryView withSkipped(boolean newSkipped) {
+        return new SettlementReconstructionEntryView(
+                index,
+                requiredItemId,
+                requiredCount,
+                positionText,
+                dimensionText,
+                newSkipped,
+                restored
+        );
+    }
+
     public void write(FriendlyByteBuf buf) {
         buf.writeInt(index);
         buf.writeUtf(requiredItemId);
         buf.writeInt(requiredCount);
         buf.writeUtf(positionText);
         buf.writeUtf(dimensionText);
+        buf.writeBoolean(skipped);
+        buf.writeBoolean(restored);
     }
 
     public static SettlementReconstructionEntryView read(FriendlyByteBuf buf) {
@@ -57,7 +89,9 @@ public class SettlementReconstructionEntryView {
                 buf.readUtf(),
                 buf.readInt(),
                 buf.readUtf(),
-                buf.readUtf()
+                buf.readUtf(),
+                buf.readBoolean(),
+                buf.readBoolean()
         );
     }
 }

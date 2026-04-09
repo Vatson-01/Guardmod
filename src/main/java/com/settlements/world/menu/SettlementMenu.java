@@ -39,6 +39,19 @@ public class SettlementMenu extends AbstractContainerMenu {
     public static final int BUTTON_OPEN_RECONSTRUCTION_STORAGE = 12;
     public static final int BUTTON_RESTORE_RECONSTRUCTION = 13;
 
+    public static final int BUTTON_SELECT_RESIDENT_BASE = 1000;
+    public static final int BUTTON_TOGGLE_SELECTED_PERMISSION_BASE = 2000;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 = 3000;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 = 3001;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 = 3002;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_100 = 3003;
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_10 = 3010;
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_1 = 3011;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_1 = 3012;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_10 = 3013;
+    public static final int BUTTON_SKIP_RECON_ENTRY_BASE = 4000;
+    public static final int BUTTON_STOP_RECONSTRUCTION = 1000000;
+
     private static final int DATA_SELECTED_TAB = 0;
     private static final int DATA_RESIDENT_PAGE = 1;
     private static final int DATA_WAR_PAGE = 2;
@@ -63,7 +76,21 @@ public class SettlementMenu extends AbstractContainerMenu {
     private static final int DATA_ACTIVE_WAR_COUNT = 21;
     private static final int DATA_IS_UNDER_SIEGE = 22;
     private static final int DATA_IS_ATTACKING_SIEGE = 23;
-    private static final int DATA_COUNT = 24;
+    private static final int DATA_SELECTED_RESIDENT_INDEX = 24;
+    private static final int DATA_SELECTED_RESIDENT_EXISTS = 25;
+    private static final int DATA_SELECTED_RESIDENT_IS_LEADER = 26;
+    private static final int DATA_SELECTED_RESIDENT_PERMISSION_MASK_LOW = 27;
+    private static final int DATA_SELECTED_RESIDENT_PERMISSION_MASK_HIGH = 28;
+    private static final int DATA_SELECTED_RESIDENT_PERSONAL_TAX_LOW = 29;
+    private static final int DATA_SELECTED_RESIDENT_PERSONAL_TAX_HIGH = 30;
+    private static final int DATA_SELECTED_RESIDENT_DEBT_LOW = 31;
+    private static final int DATA_SELECTED_RESIDENT_DEBT_HIGH = 32;
+    private static final int DATA_SELECTED_RESIDENT_SHOP_TAX = 33;
+    private static final int DATA_CAN_EDIT_SELECTED_RESIDENT_PERMISSIONS = 34;
+    private static final int DATA_CAN_EDIT_SELECTED_RESIDENT_PERSONAL_TAX = 35;
+    private static final int DATA_CAN_EDIT_SELECTED_RESIDENT_SHOP_TAX = 36;
+    private static final int DATA_CAN_STOP_RECONSTRUCTION = 37;
+    private static final int DATA_COUNT = 38;
 
     private final UUID settlementId;
     private final String settlementName;
@@ -138,6 +165,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                     member.getPlayerUuid().toString(),
                     member.isLeader(),
                     member.getPermissionSet().asReadOnlySet().size(),
+                    encodePermissionMask(member),
                     member.getPersonalTaxAmount(),
                     member.getPersonalTaxDebt(),
                     member.getShopTaxPercent()
@@ -178,16 +206,14 @@ public class SettlementMenu extends AbstractContainerMenu {
         if (session != null) {
             for (int i = 0; i < session.getEntries().size(); i++) {
                 ReconstructionBlockEntry entry = session.getEntries().get(i);
-                if (!entry.isPending()) {
-                    continue;
-                }
-
                 reconstructionViews.add(new SettlementReconstructionEntryView(
                         i + 1,
                         entry.getRequiredItemId(),
                         entry.getRequiredCount(),
                         entry.getPos().toShortString(),
-                        entry.getDimensionId().toString()
+                        entry.getDimensionId().toString(),
+                        entry.isSkipped(),
+                        entry.isRestored()
                 ));
             }
         }
@@ -211,6 +237,20 @@ public class SettlementMenu extends AbstractContainerMenu {
         return playerUuid.toString();
     }
 
+    private static long encodePermissionMask(SettlementMember member) {
+        if (member == null) {
+            return 0L;
+        }
+
+        long mask = 0L;
+        for (SettlementPermission permission : SettlementPermission.values()) {
+            if (member.getPermissionSet().has(permission)) {
+                mask |= (1L << permission.ordinal());
+            }
+        }
+        return mask;
+    }
+
     private static ContainerData createClientData() {
         return new SimpleContainerData(DATA_COUNT);
     }
@@ -221,6 +261,7 @@ public class SettlementMenu extends AbstractContainerMenu {
             private int residentPage = 0;
             private int warPage = 0;
             private int reconstructionPage = 0;
+            private int selectedResidentIndex = 0;
 
             private Settlement getSettlement() {
                 if (!(playerInventory.player instanceof ServerPlayer)) {
@@ -252,6 +293,61 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
                 ServerPlayer serverPlayer = (ServerPlayer) playerInventory.player;
                 return SettlementSavedData.get(serverPlayer.server).getActiveWarsForSettlement(settlementId);
+            }
+
+            private SettlementMember getSelectedResident(Settlement settlement) {
+                if (settlement == null) {
+                    return null;
+                }
+
+                if (selectedResidentIndex < 0 || selectedResidentIndex >= settlement.getMembers().size()) {
+                    return null;
+                }
+
+                int current = 0;
+                for (SettlementMember member : settlement.getMembers()) {
+                    if (current == selectedResidentIndex) {
+                        return member;
+                    }
+                    current++;
+                }
+                return null;
+            }
+
+            private boolean canEditSelectedResidentPermissions(Settlement settlement, SettlementMember self, SettlementMember target) {
+                if (settlement == null || self == null || target == null || target.isLeader()) {
+                    return false;
+                }
+                if (settlement.isLeader(playerInventory.player.getUUID())) {
+                    return true;
+                }
+                return self.getPermissionSet().has(SettlementPermission.GRANT_PERMISSIONS);
+            }
+
+            private boolean canEditSelectedResidentPersonalTax(Settlement settlement, SettlementMember self, SettlementMember target) {
+                if (settlement == null || self == null || target == null || target.isLeader()) {
+                    return false;
+                }
+                if (settlement.isLeader(playerInventory.player.getUUID())) {
+                    return true;
+                }
+                return self.getPermissionSet().has(SettlementPermission.CHANGE_PLAYER_TAX);
+            }
+
+            private boolean canEditSelectedResidentShopTax(Settlement settlement, SettlementMember self, SettlementMember target) {
+                if (settlement == null || self == null || target == null || target.isLeader()) {
+                    return false;
+                }
+                if (settlement.isLeader(playerInventory.player.getUUID())) {
+                    return true;
+                }
+                return self.getPermissionSet().has(SettlementPermission.CHANGE_PLAYER_SHOP_TAX);
+            }
+
+            private boolean canStopReconstruction(Settlement settlement, ReconstructionSession reconstruction) {
+                return settlement != null
+                        && reconstruction != null
+                        && settlement.isLeader(playerInventory.player.getUUID());
             }
 
             @Override
@@ -348,6 +444,53 @@ public class SettlementMenu extends AbstractContainerMenu {
                     return SettlementSavedData.get(serverPlayer.server).getActiveSiegeForAttackerSettlement(settlementId) != null ? 1 : 0;
                 }
 
+                SettlementMember selectedResident = getSelectedResident(settlement);
+                if (index == DATA_SELECTED_RESIDENT_INDEX) {
+                    return selectedResidentIndex;
+                }
+                if (index == DATA_SELECTED_RESIDENT_EXISTS) {
+                    return selectedResident == null ? 0 : 1;
+                }
+                if (index == DATA_SELECTED_RESIDENT_IS_LEADER) {
+                    return selectedResident != null && selectedResident.isLeader() ? 1 : 0;
+                }
+                long selectedPermissionMask = encodePermissionMask(selectedResident);
+                if (index == DATA_SELECTED_RESIDENT_PERMISSION_MASK_LOW) {
+                    return (int) (selectedPermissionMask & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_RESIDENT_PERMISSION_MASK_HIGH) {
+                    return (int) ((selectedPermissionMask >>> 32) & 0xFFFFFFFFL);
+                }
+                long selectedPersonalTax = selectedResident == null ? 0L : selectedResident.getPersonalTaxAmount();
+                if (index == DATA_SELECTED_RESIDENT_PERSONAL_TAX_LOW) {
+                    return (int) (selectedPersonalTax & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_RESIDENT_PERSONAL_TAX_HIGH) {
+                    return (int) ((selectedPersonalTax >>> 32) & 0xFFFFFFFFL);
+                }
+                long selectedDebt = selectedResident == null ? 0L : selectedResident.getPersonalTaxDebt();
+                if (index == DATA_SELECTED_RESIDENT_DEBT_LOW) {
+                    return (int) (selectedDebt & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_RESIDENT_DEBT_HIGH) {
+                    return (int) ((selectedDebt >>> 32) & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_RESIDENT_SHOP_TAX) {
+                    return selectedResident == null ? 0 : selectedResident.getShopTaxPercent();
+                }
+                if (index == DATA_CAN_EDIT_SELECTED_RESIDENT_PERMISSIONS) {
+                    return canEditSelectedResidentPermissions(settlement, self, selectedResident) ? 1 : 0;
+                }
+                if (index == DATA_CAN_EDIT_SELECTED_RESIDENT_PERSONAL_TAX) {
+                    return canEditSelectedResidentPersonalTax(settlement, self, selectedResident) ? 1 : 0;
+                }
+                if (index == DATA_CAN_EDIT_SELECTED_RESIDENT_SHOP_TAX) {
+                    return canEditSelectedResidentShopTax(settlement, self, selectedResident) ? 1 : 0;
+                }
+                if (index == DATA_CAN_STOP_RECONSTRUCTION) {
+                    return canStopReconstruction(settlement, reconstruction) ? 1 : 0;
+                }
+
                 return 0;
             }
 
@@ -367,6 +510,10 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
                 if (index == DATA_RECONSTRUCTION_PAGE) {
                     reconstructionPage = Math.max(0, value);
+                    return;
+                }
+                if (index == DATA_SELECTED_RESIDENT_INDEX) {
+                    selectedResidentIndex = Math.max(0, value);
                 }
             }
 
@@ -405,7 +552,7 @@ public class SettlementMenu extends AbstractContainerMenu {
 
     private void addPlayerInventorySlots(Inventory playerInventory) {
         int startX = 8;
-        int startY = 140;
+        int startY = 180;
 
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
@@ -413,7 +560,7 @@ public class SettlementMenu extends AbstractContainerMenu {
             }
         }
 
-        int hotbarY = 198;
+        int hotbarY = 238;
         for (int column = 0; column < 9; column++) {
             this.addSlot(new Slot(playerInventory, column, startX + column * 18, hotbarY));
         }
@@ -537,6 +684,81 @@ public class SettlementMenu extends AbstractContainerMenu {
         return menuData.get(DATA_IS_ATTACKING_SIEGE) != 0;
     }
 
+    public int getSelectedResidentIndex() {
+        return menuData.get(DATA_SELECTED_RESIDENT_INDEX);
+    }
+
+    public boolean hasSelectedResident() {
+        return menuData.get(DATA_SELECTED_RESIDENT_EXISTS) != 0;
+    }
+
+    public boolean isSelectedResidentLeader() {
+        return menuData.get(DATA_SELECTED_RESIDENT_IS_LEADER) != 0;
+    }
+
+    public long getSelectedResidentPermissionMask() {
+        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_PERMISSION_MASK_LOW));
+        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_PERMISSION_MASK_HIGH));
+        return low | (high << 32);
+    }
+
+    public boolean selectedResidentHasPermission(SettlementPermission permission) {
+        if (permission == null) {
+            return false;
+        }
+        long mask = getSelectedResidentPermissionMask();
+        return (mask & (1L << permission.ordinal())) != 0L;
+    }
+
+    public long getSelectedResidentPersonalTaxAmount() {
+        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_PERSONAL_TAX_LOW));
+        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_PERSONAL_TAX_HIGH));
+        return low | (high << 32);
+    }
+
+    public long getSelectedResidentPersonalDebt() {
+        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_DEBT_LOW));
+        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_DEBT_HIGH));
+        return low | (high << 32);
+    }
+
+    public int getSelectedResidentShopTaxPercent() {
+        return menuData.get(DATA_SELECTED_RESIDENT_SHOP_TAX);
+    }
+
+    public boolean canEditSelectedResidentPermissions() {
+        return menuData.get(DATA_CAN_EDIT_SELECTED_RESIDENT_PERMISSIONS) != 0;
+    }
+
+    public boolean canEditSelectedResidentPersonalTax() {
+        return menuData.get(DATA_CAN_EDIT_SELECTED_RESIDENT_PERSONAL_TAX) != 0;
+    }
+
+    public boolean canEditSelectedResidentShopTax() {
+        return menuData.get(DATA_CAN_EDIT_SELECTED_RESIDENT_SHOP_TAX) != 0;
+    }
+
+    public boolean canStopReconstruction() {
+        return menuData.get(DATA_CAN_STOP_RECONSTRUCTION) != 0;
+    }
+
+    public SettlementResidentView getResidentViewByIndex(int index) {
+        if (index < 0 || index >= residentViews.size()) {
+            return null;
+        }
+        return residentViews.get(index);
+    }
+
+    public void clientMarkReconstructionEntrySkipped(int oneBasedIndex) {
+        for (int i = 0; i < reconstructionViews.size(); i++) {
+            SettlementReconstructionEntryView view = reconstructionViews.get(i);
+            if (view.getIndex() == oneBasedIndex) {
+                reconstructionViews.set(i, view.withSkipped(true));
+                return;
+            }
+        }
+    }
+
     @Override
     public boolean clickMenuButton(Player player, int buttonId) {
         if (buttonId == BUTTON_TAB_OVERVIEW) {
@@ -566,6 +788,11 @@ public class SettlementMenu extends AbstractContainerMenu {
             return true;
         }
 
+        if (buttonId >= BUTTON_SELECT_RESIDENT_BASE && buttonId < BUTTON_TOGGLE_SELECTED_PERMISSION_BASE) {
+            menuData.set(DATA_SELECTED_RESIDENT_INDEX, buttonId - BUTTON_SELECT_RESIDENT_BASE);
+            return true;
+        }
+
         if (!(player instanceof ServerPlayer)) {
             return false;
         }
@@ -573,6 +800,80 @@ public class SettlementMenu extends AbstractContainerMenu {
         ServerPlayer serverPlayer = (ServerPlayer) player;
 
         try {
+            SettlementSavedData data = SettlementSavedData.get(serverPlayer.server);
+            Settlement settlement = data.getSettlement(settlementId);
+            SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
+            SettlementMember selectedResident = null;
+            if (settlement != null) {
+                int selectedResidentIndex = menuData.get(DATA_SELECTED_RESIDENT_INDEX);
+                int current = 0;
+                for (SettlementMember member : settlement.getMembers()) {
+                    if (current == selectedResidentIndex) {
+                        selectedResident = member;
+                        break;
+                    }
+                    current++;
+                }
+            }
+
+            if (buttonId >= BUTTON_TOGGLE_SELECTED_PERMISSION_BASE
+                    && buttonId < BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + SettlementPermission.values().length) {
+                SettlementPermission permission = SettlementPermission.values()[buttonId - BUTTON_TOGGLE_SELECTED_PERMISSION_BASE];
+                if (!canEditResidentPermissions(serverPlayer, settlement, self, selectedResident)) {
+                    throw new IllegalStateException("Нет права на изменение прав этого жителя.");
+                }
+                if (selectedResident.getPermissionSet().has(permission)) {
+                    selectedResident.getPermissionSet().revoke(permission);
+                } else {
+                    selectedResident.getPermissionSet().grant(permission);
+                }
+                data.setDirty();
+                return true;
+            }
+
+            if (buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_100
+                    || buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_10
+                    || buttonId == BUTTON_SELECTED_PERSONAL_TAX_PLUS_10
+                    || buttonId == BUTTON_SELECTED_PERSONAL_TAX_PLUS_100) {
+                if (!canEditResidentPersonalTax(serverPlayer, settlement, self, selectedResident)) {
+                    throw new IllegalStateException("Нет права на изменение личного налога этого жителя.");
+                }
+                long delta = buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 ? -100L
+                        : buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 ? -10L
+                        : buttonId == BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 ? 10L
+                        : 100L;
+                selectedResident.setPersonalTaxAmount(selectedResident.getPersonalTaxAmount() + delta);
+                data.setDirty();
+                return true;
+            }
+
+            if (buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_10
+                    || buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_1
+                    || buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_1
+                    || buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_10) {
+                if (!canEditResidentShopTax(serverPlayer, settlement, self, selectedResident)) {
+                    throw new IllegalStateException("Нет права на изменение налога магазинов этого жителя.");
+                }
+                int delta = buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_10 ? -10
+                        : buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_1 ? -1
+                        : buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_1 ? 1
+                        : 10;
+                selectedResident.setShopTaxPercent(selectedResident.getShopTaxPercent() + delta);
+                data.setDirty();
+                return true;
+            }
+
+            if (buttonId == BUTTON_STOP_RECONSTRUCTION) {
+                ReconstructionService.stopActive(serverPlayer);
+                serverPlayer.displayClientMessage(Component.literal("Реконструкция принудительно остановлена."), true);
+                return true;
+            }
+
+            if (buttonId >= BUTTON_SKIP_RECON_ENTRY_BASE && buttonId < BUTTON_STOP_RECONSTRUCTION) {
+                ReconstructionService.skipEntryByIndex(serverPlayer, buttonId - BUTTON_SKIP_RECON_ENTRY_BASE);
+                return true;
+            }
+
             if (buttonId == BUTTON_OPEN_RECONSTRUCTION_STORAGE) {
                 ReconstructionService.openStorage(serverPlayer);
                 return true;
@@ -599,6 +900,36 @@ public class SettlementMenu extends AbstractContainerMenu {
         }
 
         return false;
+    }
+
+    private static boolean canEditResidentPermissions(ServerPlayer actor, Settlement settlement, SettlementMember self, SettlementMember target) {
+        if (settlement == null || self == null || target == null || target.isLeader()) {
+            return false;
+        }
+        if (settlement.isLeader(actor.getUUID())) {
+            return true;
+        }
+        return self.getPermissionSet().has(SettlementPermission.GRANT_PERMISSIONS);
+    }
+
+    private static boolean canEditResidentPersonalTax(ServerPlayer actor, Settlement settlement, SettlementMember self, SettlementMember target) {
+        if (settlement == null || self == null || target == null || target.isLeader()) {
+            return false;
+        }
+        if (settlement.isLeader(actor.getUUID())) {
+            return true;
+        }
+        return self.getPermissionSet().has(SettlementPermission.CHANGE_PLAYER_TAX);
+    }
+
+    private static boolean canEditResidentShopTax(ServerPlayer actor, Settlement settlement, SettlementMember self, SettlementMember target) {
+        if (settlement == null || self == null || target == null || target.isLeader()) {
+            return false;
+        }
+        if (settlement.isLeader(actor.getUUID())) {
+            return true;
+        }
+        return self.getPermissionSet().has(SettlementPermission.CHANGE_PLAYER_SHOP_TAX);
     }
 
     private void decrementPage() {
