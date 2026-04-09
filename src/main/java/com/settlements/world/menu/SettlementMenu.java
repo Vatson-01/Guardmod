@@ -21,6 +21,7 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.network.NetworkHooks;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -124,7 +125,15 @@ public class SettlementMenu extends AbstractContainerMenu {
                 containerId,
                 playerInventory,
                 openData,
-                createServerData(playerInventory, openData)
+                createServerData(
+                        playerInventory,
+                        openData,
+                        SettlementMenuTab.OVERVIEW.getIndex(),
+                        0,
+                        0,
+                        0,
+                        0
+                )
         );
     }
 
@@ -196,7 +205,8 @@ public class SettlementMenu extends AbstractContainerMenu {
                     ? war.getSettlementBId()
                     : war.getSettlementAId();
 
-            String otherName = resolvePlayerName(serverPlayer, otherId);
+            Settlement otherSettlement = data.getSettlement(otherId);
+            String otherName = otherSettlement == null ? otherId.toString() : otherSettlement.getName();
             String detail = "Активная война";
 
             if (defendingSiege != null && defendingSiege.getWarId().equals(war.getId())) {
@@ -304,13 +314,21 @@ public class SettlementMenu extends AbstractContainerMenu {
         return new SimpleContainerData(DATA_COUNT);
     }
 
-    private static ContainerData createServerData(final Inventory playerInventory, final OpenData openData) {
+    private static ContainerData createServerData(
+            final Inventory playerInventory,
+            final OpenData openData,
+            final int initialSelectedTab,
+            final int initialResidentPage,
+            final int initialWarPage,
+            final int initialReconstructionPage,
+            final int initialSelectedResidentIndex
+    ) {
         return new ContainerData() {
-            private int selectedTab = SettlementMenuTab.OVERVIEW.getIndex();
-            private int residentPage = 0;
-            private int warPage = 0;
-            private int reconstructionPage = 0;
-            private int selectedResidentIndex = 0;
+            private int selectedTab = initialSelectedTab;
+            private int residentPage = Math.max(0, initialResidentPage);
+            private int warPage = Math.max(0, initialWarPage);
+            private int reconstructionPage = Math.max(0, initialReconstructionPage);
+            private int selectedResidentIndex = Math.max(0, initialSelectedResidentIndex);
 
             private final UUID settlementId = openData.settlementId;
             private final List<UUID> residentOrder = createResidentOrderFromOpenData();
@@ -965,6 +983,7 @@ public class SettlementMenu extends AbstractContainerMenu {
     public void clientMarkReconstructionEntrySkipped(int oneBasedIndex) {
         clientSetReconstructionEntrySkipped(oneBasedIndex, true);
     }
+
     private SettlementMember resolveSelectedResidentFromViews(Settlement settlement) {
         if (settlement == null) {
             return null;
@@ -987,6 +1006,7 @@ public class SettlementMenu extends AbstractContainerMenu {
             return null;
         }
     }
+
     @Override
     public boolean clickMenuButton(Player player, int buttonId) {
         if (buttonId == BUTTON_TAB_OVERVIEW) {
@@ -1045,6 +1065,7 @@ public class SettlementMenu extends AbstractContainerMenu {
             Settlement settlement = data.getSettlement(settlementId);
             SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
             SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
+            ReconstructionSession reconstruction = data.getActiveReconstructionForSettlement(settlementId);
 
             if (buttonId >= BUTTON_TOGGLE_SELECTED_PERMISSION_BASE
                     && buttonId < BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + SettlementPermission.values().length) {
@@ -1097,27 +1118,39 @@ public class SettlementMenu extends AbstractContainerMenu {
             }
 
             if (buttonId == BUTTON_STOP_RECONSTRUCTION) {
+                if (!canForceStopReconstruction(serverPlayer, settlement, reconstruction)) {
+                    throw new IllegalStateException("Нет права на принудительную остановку реконструкции.");
+                }
                 ReconstructionService.stopActive(serverPlayer);
-                broadcastChanges();
+                reopenFor(serverPlayer);
                 serverPlayer.displayClientMessage(Component.literal("Реконструкция принудительно остановлена."), true);
                 return true;
             }
 
             if (buttonId >= BUTTON_SKIP_RECON_ENTRY_BASE && buttonId < BUTTON_STOP_RECONSTRUCTION) {
+                if (!canToggleReconstructionEntries(serverPlayer, settlement, self, reconstruction)) {
+                    throw new IllegalStateException("Нет права изменять список блоков реконструкции.");
+                }
                 ReconstructionService.skipEntryByIndex(serverPlayer, buttonId - BUTTON_SKIP_RECON_ENTRY_BASE);
                 broadcastChanges();
                 return true;
             }
 
             if (buttonId == BUTTON_OPEN_RECONSTRUCTION_STORAGE) {
+                if (!canOpenReconstructionStorage(serverPlayer, settlement, self, reconstruction)) {
+                    throw new IllegalStateException("Нет права открывать склад реконструкции.");
+                }
                 ReconstructionService.openStorage(serverPlayer);
                 broadcastChanges();
                 return true;
             }
 
             if (buttonId == BUTTON_RESTORE_RECONSTRUCTION) {
+                if (!canRestoreReconstruction(serverPlayer, settlement, self, reconstruction)) {
+                    throw new IllegalStateException("Нет права запускать восстановление реконструкции.");
+                }
                 ReconstructionRestoreResult result = ReconstructionService.restoreAvailable(serverPlayer);
-                broadcastChanges();
+                reopenFor(serverPlayer);
                 serverPlayer.displayClientMessage(
                         Component.literal(
                                 "Восстановлено: " + result.getRestored()
@@ -1132,12 +1165,13 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return true;
             }
         } catch (Exception e) {
-            serverPlayer.displayClientMessage(Component.literal(e.getMessage()), true);
+            serverPlayer.displayClientMessage(Component.literal(messageOrDefault(e, "Ошибка выполнения действия.")), true);
             return false;
         }
 
         return false;
     }
+
     private static boolean canEditResidentPermissions(ServerPlayer actor, Settlement settlement, SettlementMember self, SettlementMember target) {
         if (settlement == null || self == null || target == null || target.isLeader()) {
             return false;
@@ -1166,6 +1200,80 @@ public class SettlementMenu extends AbstractContainerMenu {
             return true;
         }
         return self.getPermissionSet().has(SettlementPermission.CHANGE_PLAYER_SHOP_TAX);
+    }
+
+    private static boolean canOpenReconstructionStorage(ServerPlayer actor, Settlement settlement, SettlementMember self, ReconstructionSession reconstruction) {
+        if (settlement == null || reconstruction == null || self == null) {
+            return false;
+        }
+        if (settlement.isLeader(actor.getUUID())) {
+            return true;
+        }
+        return self.getPermissionSet().has(SettlementPermission.OPEN_RECONSTRUCTION_STORAGE)
+                || self.getPermissionSet().has(SettlementPermission.CONTRIBUTE_RECONSTRUCTION_RESOURCES);
+    }
+
+    private static boolean canRestoreReconstruction(ServerPlayer actor, Settlement settlement, SettlementMember self, ReconstructionSession reconstruction) {
+        if (settlement == null || reconstruction == null || self == null) {
+            return false;
+        }
+        if (settlement.isLeader(actor.getUUID())) {
+            return true;
+        }
+        return self.getPermissionSet().has(SettlementPermission.ENABLE_RECONSTRUCTION)
+                || self.getPermissionSet().has(SettlementPermission.CONTRIBUTE_RECONSTRUCTION_RESOURCES);
+    }
+
+    private static boolean canToggleReconstructionEntries(ServerPlayer actor, Settlement settlement, SettlementMember self, ReconstructionSession reconstruction) {
+        return canRestoreReconstruction(actor, settlement, self, reconstruction);
+    }
+
+    private static boolean canForceStopReconstruction(ServerPlayer actor, Settlement settlement, ReconstructionSession reconstruction) {
+        return settlement != null
+                && reconstruction != null
+                && settlement.isLeader(actor.getUUID());
+    }
+
+    private void reopenFor(final ServerPlayer serverPlayer) {
+        final OpenData openData = buildOpenData(serverPlayer.getInventory(), settlementId);
+        final int selectedTab = getSelectedTabIndex();
+        final int residentPage = getResidentPage();
+        final int warPage = getWarPage();
+        final int reconstructionPage = getReconstructionPage();
+        final int selectedResidentIndex = getSelectedResidentIndex();
+
+        NetworkHooks.openScreen(
+                serverPlayer,
+                new net.minecraft.world.SimpleMenuProvider(
+                        (containerId, playerInventory, ignoredPlayer) -> new SettlementMenu(
+                                containerId,
+                                playerInventory,
+                                openData,
+                                createServerData(
+                                        playerInventory,
+                                        openData,
+                                        selectedTab,
+                                        residentPage,
+                                        warPage,
+                                        reconstructionPage,
+                                        selectedResidentIndex
+                                )
+                        ),
+                        Component.literal(settlementName)
+                ),
+                buf -> openData.write(buf)
+        );
+    }
+
+    private static String messageOrDefault(Throwable throwable, String fallback) {
+        if (throwable == null) {
+            return fallback;
+        }
+        String message = throwable.getMessage();
+        if (message == null || message.trim().isEmpty()) {
+            return fallback;
+        }
+        return message;
     }
 
     private void decrementPage() {

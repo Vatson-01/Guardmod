@@ -254,6 +254,10 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 return;
             }
 
+            if (!menu.canRestoreReconstruction()) {
+                return;
+            }
+
             List<SettlementReconstructionEntryView> blocks = getVisibleReconstructionBlocks();
             int index = reconstructionBlockPage * LIST_ROWS + row;
             if (index >= 0 && index < blocks.size()) {
@@ -380,14 +384,13 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                     String prefix = entry.isSkipped() ? "[П] " : entry.isRestored() ? "[V] " : "[ ] ";
                     listButtons[row].setMessage(Component.literal(shorten(prefix + entry.getPositionText(), 20)));
                     listButtons[row].visible = true;
-                    listButtons[row].active = !entry.isRestored();
+                    listButtons[row].active = !entry.isRestored() && menu.canRestoreReconstruction();
                 }
             }
         }
 
         boolean residentsTab = selectedTab == SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab();
         boolean hasSelectedResident = residentsTab && menu.hasSelectedResident();
-        boolean selectedResidentIsLeader = hasSelectedResident && menu.isSelectedResidentLeader();
 
         residentTaxesModeButton.visible = residentsTab;
         residentPermissionsModeButton.visible = residentsTab && menu.canViewResidentPermissionPage();
@@ -418,7 +421,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 SettlementPermission permission = permissions[index];
                 visiblePermissionOrdinals[row] = permission.ordinal();
                 permissionButtons[row].visible = true;
-                permissionButtons[row].active = menu.hasSelectedResident() && !menu.isSelectedResidentLeader();
+                permissionButtons[row].active = menu.canEditSelectedResidentPermissions();
                 permissionButtons[row].setMessage(Component.literal(menu.selectedResidentHasPermission(permission) ? "Вкл" : "Выкл"));
             }
         }
@@ -433,16 +436,18 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         shopTaxPlus1Button.visible = taxesMode;
         shopTaxPlus10Button.visible = taxesMode;
 
-        boolean allowTaxButtons = taxesMode && menu.hasSelectedResident() && !menu.isSelectedResidentLeader();
+        boolean allowPersonalTaxButtons = taxesMode && menu.canEditSelectedResidentPersonalTax();
+        boolean allowShopTaxButtons = taxesMode && menu.canEditSelectedResidentShopTax();
 
-        personalTaxMinus100Button.active = allowTaxButtons;
-        personalTaxMinus10Button.active = allowTaxButtons;
-        personalTaxPlus10Button.active = allowTaxButtons;
-        personalTaxPlus100Button.active = allowTaxButtons;
-        shopTaxMinus10Button.active = allowTaxButtons;
-        shopTaxMinus1Button.active = allowTaxButtons;
-        shopTaxPlus1Button.active = allowTaxButtons;
-        shopTaxPlus10Button.active = allowTaxButtons;
+        personalTaxMinus100Button.active = allowPersonalTaxButtons;
+        personalTaxMinus10Button.active = allowPersonalTaxButtons;
+        personalTaxPlus10Button.active = allowPersonalTaxButtons;
+        personalTaxPlus100Button.active = allowPersonalTaxButtons;
+
+        shopTaxMinus10Button.active = allowShopTaxButtons;
+        shopTaxMinus1Button.active = allowShopTaxButtons;
+        shopTaxPlus1Button.active = allowShopTaxButtons;
+        shopTaxPlus10Button.active = allowShopTaxButtons;
 
         boolean reconstructionTab = selectedTab == SettlementMenuTab.RECONSTRUCTION;
         reconstructionResourcesModeButton.visible = reconstructionTab;
@@ -453,10 +458,11 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         restoreButton.visible = reconstructionTab;
         stopReconstructionButton.visible = reconstructionTab;
 
-        openStorageButton.active = reconstructionTab && menu.hasActiveReconstruction();
-        restoreButton.active = reconstructionTab && menu.hasActiveReconstruction();
-        stopReconstructionButton.active = reconstructionTab && menu.hasActiveReconstruction() && menu.canStopReconstruction();
+        openStorageButton.active = reconstructionTab && menu.canOpenReconstructionStorage();
+        restoreButton.active = reconstructionTab && menu.canRestoreReconstruction();
+        stopReconstructionButton.active = reconstructionTab && menu.canStopReconstruction();
     }
+
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         int left = this.leftPos;
@@ -470,15 +476,15 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
-                int slotX = left + 7 + column * 18;
-                int slotY = top + 179 + row * 18;
+                int slotX = left + 8 + column * 18;
+                int slotY = top + 180 + row * 18;
                 graphics.fill(slotX, slotY, slotX + 18, slotY + 18, 0xFF555555);
             }
         }
 
         for (int column = 0; column < 9; column++) {
-            int slotX = left + 7 + column * 18;
-            int slotY = top + 237;
+            int slotX = left + 8 + column * 18;
+            int slotY = top + 238;
             graphics.fill(slotX, slotY, slotX + 18, slotY + 18, 0xFF555555);
         }
     }
