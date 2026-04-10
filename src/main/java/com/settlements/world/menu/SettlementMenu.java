@@ -1178,13 +1178,14 @@ public class SettlementMenu extends AbstractContainerMenu {
             return true;
         }
 
-        if (buttonId >= BUTTON_SELECT_RESIDENT_BASE && buttonId < BUTTON_SELECT_RESIDENT_BASE + 7) {
+        if (buttonId >= BUTTON_SELECT_RESIDENT_BASE
+                && buttonId < BUTTON_SELECT_RESIDENT_BASE + PAGE_SIZE) {
             if (!canAccessResidentsTab()) {
                 return false;
             }
 
             int row = buttonId - BUTTON_SELECT_RESIDENT_BASE;
-            int selectedIndex = getResidentPage() * 7 + row;
+            int selectedIndex = getResidentPage() * PAGE_SIZE + row;
             if (selectedIndex < 0 || selectedIndex >= residentViews.size()) {
                 return false;
             }
@@ -1206,12 +1207,15 @@ public class SettlementMenu extends AbstractContainerMenu {
             SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
             ReconstructionSession reconstruction = data.getActiveReconstructionForSettlement(settlementId);
 
-
             if (buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_100
                     || buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_10
                     || buttonId == BUTTON_SELECTED_PERSONAL_TAX_PLUS_10
                     || buttonId == BUTTON_SELECTED_PERSONAL_TAX_PLUS_100) {
+
                 SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
+                if (selectedResident == null) {
+                    throw new IllegalStateException("Житель не выбран.");
+                }
                 if (!canEditResidentPersonalTax(this.residentViews, serverPlayer, settlement, self, selectedResident)) {
                     throw new IllegalStateException("Нет права на изменение личного налога этого жителя.");
                 }
@@ -1221,7 +1225,12 @@ public class SettlementMenu extends AbstractContainerMenu {
                         : buttonId == BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 ? 10L
                         : 100L;
 
-                selectedResident.setPersonalTaxAmount(selectedResident.getPersonalTaxAmount() + delta);
+                long updatedTax = selectedResident.getPersonalTaxAmount() + delta;
+                if (updatedTax < 0L) {
+                    updatedTax = 0L;
+                }
+
+                selectedResident.setPersonalTaxAmount(updatedTax);
                 data.setDirty();
                 refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
@@ -1231,7 +1240,11 @@ public class SettlementMenu extends AbstractContainerMenu {
                     || buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_1
                     || buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_1
                     || buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_10) {
+
                 SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
+                if (selectedResident == null) {
+                    throw new IllegalStateException("Житель не выбран.");
+                }
                 if (!canEditResidentShopTax(this.residentViews, serverPlayer, settlement, self, selectedResident)) {
                     throw new IllegalStateException("Нет права на изменение налога магазинов этого жителя.");
                 }
@@ -1241,7 +1254,15 @@ public class SettlementMenu extends AbstractContainerMenu {
                         : buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_1 ? 1
                         : 10;
 
-                selectedResident.setShopTaxPercent(selectedResident.getShopTaxPercent() + delta);
+                int updatedShopTax = selectedResident.getShopTaxPercent() + delta;
+                if (updatedShopTax < 0) {
+                    updatedShopTax = 0;
+                }
+                if (updatedShopTax > 100) {
+                    updatedShopTax = 100;
+                }
+
+                selectedResident.setShopTaxPercent(updatedShopTax);
                 data.setDirty();
                 refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
@@ -1257,7 +1278,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return true;
             }
 
-            if (buttonId >= BUTTON_SKIP_RECON_ENTRY_BASE && buttonId < BUTTON_STOP_RECONSTRUCTION) {
+            if (buttonId >= BUTTON_SKIP_RECON_ENTRY_BASE) {
                 if (!canToggleReconstructionEntries(serverPlayer, settlement, self, reconstruction)) {
                     throw new IllegalStateException("Нет права изменять список блоков реконструкции.");
                 }
@@ -1284,6 +1305,9 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
 
                 SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
+                if (selectedResident == null) {
+                    throw new IllegalStateException("Житель не выбран.");
+                }
                 if (!canEditResidentPermissions(this.residentViews, serverPlayer, settlement, self, selectedResident)) {
                     throw new IllegalStateException("Нет права на изменение прав этого жителя.");
                 }
