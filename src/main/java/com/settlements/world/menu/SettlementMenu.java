@@ -43,20 +43,20 @@ public class SettlementMenu extends AbstractContainerMenu {
     public static final int BUTTON_STOP_RECONSTRUCTION = 14;
 
     public static final int BUTTON_SELECT_RESIDENT_BASE = 20;
+
     public static final int BUTTON_TOGGLE_SELECTED_PERMISSION_BASE = 100;
 
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 = 140;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 = 141;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 = 142;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_100 = 143;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 = 200;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 = 201;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 = 202;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_100 = 203;
 
-    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_10 = 144;
-    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_1 = 145;
-    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_1 = 146;
-    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_10 = 147;
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_10 = 204;
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_1 = 205;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_1 = 206;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_10 = 207;
 
     public static final int BUTTON_SKIP_RECON_ENTRY_BASE = 40000;
-
     private static final int DATA_SELECTED_TAB = 0;
     private static final int DATA_RESIDENT_PAGE = 1;
     private static final int DATA_WAR_PAGE = 2;
@@ -65,12 +65,16 @@ public class SettlementMenu extends AbstractContainerMenu {
     private static final int DATA_CLAIM_COUNT = 5;
     private static final int DATA_ALLOWANCE = 6;
     private static final int DATA_IS_LEADER = 7;
-    private static final int DATA_TREASURY_LOW = 8;
-    private static final int DATA_TREASURY_HIGH = 9;
-    private static final int DATA_SETTLEMENT_DEBT_LOW = 10;
-    private static final int DATA_SETTLEMENT_DEBT_HIGH = 11;
-    private static final int DATA_PLAYER_DEBT_LOW = 12;
-    private static final int DATA_PLAYER_DEBT_HIGH = 13;
+
+    private static final int DATA_TREASURY_WORD_0 = 8;
+    private static final int DATA_TREASURY_WORD_1 = 9;
+
+    private static final int DATA_SETTLEMENT_DEBT_WORD_0 = 10;
+    private static final int DATA_SETTLEMENT_DEBT_WORD_1 = 11;
+
+    private static final int DATA_PLAYER_DEBT_WORD_0 = 12;
+    private static final int DATA_PLAYER_DEBT_WORD_1 = 13;
+
     private static final int DATA_RECON_TOTAL = 14;
     private static final int DATA_RECON_PENDING = 15;
     private static final int DATA_RECON_RESTORED = 16;
@@ -81,15 +85,20 @@ public class SettlementMenu extends AbstractContainerMenu {
     private static final int DATA_ACTIVE_WAR_COUNT = 21;
     private static final int DATA_IS_UNDER_SIEGE = 22;
     private static final int DATA_IS_ATTACKING_SIEGE = 23;
+
     private static final int DATA_SELECTED_RESIDENT_INDEX = 24;
     private static final int DATA_SELECTED_RESIDENT_EXISTS = 25;
     private static final int DATA_SELECTED_RESIDENT_IS_LEADER = 26;
-    private static final int DATA_SELECTED_RESIDENT_PERMISSION_MASK_LOW = 27;
-    private static final int DATA_SELECTED_RESIDENT_PERMISSION_MASK_HIGH = 28;
-    private static final int DATA_SELECTED_RESIDENT_PERSONAL_TAX_LOW = 29;
-    private static final int DATA_SELECTED_RESIDENT_PERSONAL_TAX_HIGH = 30;
-    private static final int DATA_SELECTED_RESIDENT_DEBT_LOW = 31;
-    private static final int DATA_SELECTED_RESIDENT_DEBT_HIGH = 32;
+
+    private static final int DATA_SELECTED_RESIDENT_PERMISSION_WORD_0 = 27;
+    private static final int DATA_SELECTED_RESIDENT_PERMISSION_WORD_1 = 28;
+
+    private static final int DATA_SELECTED_RESIDENT_PERSONAL_TAX_WORD_0 = 29;
+    private static final int DATA_SELECTED_RESIDENT_PERSONAL_TAX_WORD_1 = 30;
+
+    private static final int DATA_SELECTED_RESIDENT_DEBT_WORD_0 = 31;
+    private static final int DATA_SELECTED_RESIDENT_DEBT_WORD_1 = 32;
+
     private static final int DATA_SELECTED_RESIDENT_SHOP_TAX = 33;
     private static final int DATA_CAN_EDIT_SELECTED_RESIDENT_PERMISSIONS = 34;
     private static final int DATA_CAN_EDIT_SELECTED_RESIDENT_PERSONAL_TAX = 35;
@@ -312,6 +321,22 @@ public class SettlementMenu extends AbstractContainerMenu {
         return mask;
     }
 
+    private static int getWord(long value, int wordIndex) {
+        return (int) ((value >>> (wordIndex * 16)) & 0xFFFFL);
+    }
+
+    private static long readWords(ContainerData data, int firstIndex, int wordCount) {
+        long result = 0L;
+        for (int i = 0; i < wordCount; i++) {
+            result |= ((long) data.get(firstIndex + i) & 0xFFFFL) << (i * 16);
+        }
+        return result;
+    }
+
+    private void syncMenuState() {
+        this.broadcastChanges();
+    }
+
     private static ContainerData createClientData() {
         return new SimpleContainerData(DATA_COUNT);
     }
@@ -434,24 +459,6 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return settlement != null && settlement.isLeader(playerInventory.player.getUUID());
             }
 
-            private boolean hasNamedPermission(Settlement settlement, SettlementMember member, String permissionName) {
-                if (permissionName == null || permissionName.isEmpty()) {
-                    return false;
-                }
-                if (isLeader(settlement)) {
-                    return true;
-                }
-                if (member == null) {
-                    return false;
-                }
-                for (SettlementPermission permission : SettlementPermission.values()) {
-                    if (permissionName.equals(permission.name()) && member.getPermissionSet().has(permission)) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
             private boolean hasPermission(Settlement settlement, SettlementMember member, SettlementPermission permission) {
                 if (permission == null) {
                     return false;
@@ -467,20 +474,20 @@ public class SettlementMenu extends AbstractContainerMenu {
                         || hasPermission(settlement, self, SettlementPermission.GRANT_PERMISSIONS)
                         || hasPermission(settlement, self, SettlementPermission.CHANGE_PLAYER_TAX)
                         || hasPermission(settlement, self, SettlementPermission.CHANGE_PLAYER_SHOP_TAX)
-                        || hasNamedPermission(settlement, self, "VIEW_RESIDENT_PERMISSIONS");
+                        || hasPermission(settlement, self, SettlementPermission.VIEW_RESIDENT_PERMISSIONS);
             }
 
             private boolean canViewResidentPermissionPage(Settlement settlement, SettlementMember self) {
                 return hasPermission(settlement, self, SettlementPermission.GRANT_PERMISSIONS)
-                        || hasNamedPermission(settlement, self, "VIEW_RESIDENT_PERMISSIONS");
+                        || hasPermission(settlement, self, SettlementPermission.VIEW_RESIDENT_PERMISSIONS);
             }
 
             private boolean canViewTreasuryBalance(Settlement settlement, SettlementMember self) {
-                return hasNamedPermission(settlement, self, "VIEW_TREASURY_BALANCE");
+                return hasPermission(settlement, self, SettlementPermission.VIEW_TREASURY_BALANCE);
             }
 
             private boolean canViewSettlementDebt(Settlement settlement, SettlementMember self) {
-                return hasNamedPermission(settlement, self, "VIEW_SETTLEMENT_DEBT");
+                return hasPermission(settlement, self, SettlementPermission.VIEW_SETTLEMENT_DEBT);
             }
 
             private boolean canViewSelectedResidentDebt(Settlement settlement, SettlementMember self, SettlementMember target) {
@@ -496,7 +503,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                 if (canEditSelectedResidentPersonalTax(settlement, self, target)) {
                     return true;
                 }
-                return hasNamedPermission(settlement, self, "VIEW_PLAYER_DEBTS");
+                return hasPermission(settlement, self, SettlementPermission.VIEW_PLAYER_DEBTS);
             }
 
             @Override
@@ -531,28 +538,31 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
 
                 long treasury = settlement == null ? 0L : settlement.getTreasuryBalance();
-                if (index == DATA_TREASURY_LOW) {
-                    return (int) (treasury & 0xFFFFFFFFL);
+                if (index == DATA_TREASURY_WORD_0) {
+                    return getWord(treasury, 0);
                 }
-                if (index == DATA_TREASURY_HIGH) {
-                    return (int) ((treasury >>> 32) & 0xFFFFFFFFL);
+                if (index == DATA_TREASURY_WORD_1) {
+                    return getWord(treasury, 1);
                 }
+
 
                 long settlementDebt = settlement == null ? 0L : settlement.getSettlementDebt();
-                if (index == DATA_SETTLEMENT_DEBT_LOW) {
-                    return (int) (settlementDebt & 0xFFFFFFFFL);
+                if (index == DATA_SETTLEMENT_DEBT_WORD_0) {
+                    return getWord(settlementDebt, 0);
                 }
-                if (index == DATA_SETTLEMENT_DEBT_HIGH) {
-                    return (int) ((settlementDebt >>> 32) & 0xFFFFFFFFL);
+                if (index == DATA_SETTLEMENT_DEBT_WORD_1) {
+                    return getWord(settlementDebt, 1);
                 }
 
+
                 long playerDebt = self == null ? 0L : self.getPersonalTaxDebt();
-                if (index == DATA_PLAYER_DEBT_LOW) {
-                    return (int) (playerDebt & 0xFFFFFFFFL);
+                if (index == DATA_PLAYER_DEBT_WORD_0) {
+                    return getWord(playerDebt, 0);
                 }
-                if (index == DATA_PLAYER_DEBT_HIGH) {
-                    return (int) ((playerDebt >>> 32) & 0xFFFFFFFFL);
+                if (index == DATA_PLAYER_DEBT_WORD_1) {
+                    return getWord(playerDebt, 1);
                 }
+
 
                 if (index == DATA_RECON_TOTAL) {
                     return reconstruction == null ? 0 : reconstruction.getEntries().size();
@@ -605,28 +615,30 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
 
                 long selectedPermissionMask = encodePermissionMask(selectedResident);
-                if (index == DATA_SELECTED_RESIDENT_PERMISSION_MASK_LOW) {
-                    return (int) (selectedPermissionMask & 0xFFFFFFFFL);
+                if (index == DATA_SELECTED_RESIDENT_PERMISSION_WORD_0) {
+                    return (int) (selectedPermissionMask & 0xFFFFL);
                 }
-                if (index == DATA_SELECTED_RESIDENT_PERMISSION_MASK_HIGH) {
-                    return (int) ((selectedPermissionMask >>> 32) & 0xFFFFFFFFL);
+                if (index == DATA_SELECTED_RESIDENT_PERMISSION_WORD_1) {
+                    return (int) ((selectedPermissionMask >>> 16) & 0xFFFFL);
                 }
 
                 long selectedPersonalTax = selectedResident == null ? 0L : selectedResident.getPersonalTaxAmount();
-                if (index == DATA_SELECTED_RESIDENT_PERSONAL_TAX_LOW) {
-                    return (int) (selectedPersonalTax & 0xFFFFFFFFL);
+                if (index == DATA_SELECTED_RESIDENT_PERSONAL_TAX_WORD_0) {
+                    return getWord(selectedPersonalTax, 0);
                 }
-                if (index == DATA_SELECTED_RESIDENT_PERSONAL_TAX_HIGH) {
-                    return (int) ((selectedPersonalTax >>> 32) & 0xFFFFFFFFL);
+                if (index == DATA_SELECTED_RESIDENT_PERSONAL_TAX_WORD_1) {
+                    return getWord(selectedPersonalTax, 1);
                 }
 
+
                 long selectedDebt = selectedResident == null ? 0L : selectedResident.getPersonalTaxDebt();
-                if (index == DATA_SELECTED_RESIDENT_DEBT_LOW) {
-                    return (int) (selectedDebt & 0xFFFFFFFFL);
+                if (index == DATA_SELECTED_RESIDENT_DEBT_WORD_0) {
+                    return getWord(selectedDebt, 0);
                 }
-                if (index == DATA_SELECTED_RESIDENT_DEBT_HIGH) {
-                    return (int) ((selectedDebt >>> 32) & 0xFFFFFFFFL);
+                if (index == DATA_SELECTED_RESIDENT_DEBT_WORD_1) {
+                    return getWord(selectedDebt, 1);
                 }
+
 
                 if (index == DATA_SELECTED_RESIDENT_SHOP_TAX) {
                     return selectedResident == null ? 0 : selectedResident.getShopTaxPercent();
@@ -808,9 +820,7 @@ public class SettlementMenu extends AbstractContainerMenu {
     }
 
     public long getTreasuryBalance() {
-        long low = Integer.toUnsignedLong(menuData.get(DATA_TREASURY_LOW));
-        long high = Integer.toUnsignedLong(menuData.get(DATA_TREASURY_HIGH));
-        return low | (high << 32);
+        return readWords(menuData, DATA_TREASURY_WORD_0, 4);
     }
 
     public SettlementResidentView getSelectedResidentView() {
@@ -838,15 +848,11 @@ public class SettlementMenu extends AbstractContainerMenu {
     }
 
     public long getSettlementDebt() {
-        long low = Integer.toUnsignedLong(menuData.get(DATA_SETTLEMENT_DEBT_LOW));
-        long high = Integer.toUnsignedLong(menuData.get(DATA_SETTLEMENT_DEBT_HIGH));
-        return low | (high << 32);
+        return readWords(menuData, DATA_SETTLEMENT_DEBT_WORD_0, 4);
     }
 
     public long getPlayerDebt() {
-        long low = Integer.toUnsignedLong(menuData.get(DATA_PLAYER_DEBT_LOW));
-        long high = Integer.toUnsignedLong(menuData.get(DATA_PLAYER_DEBT_HIGH));
-        return low | (high << 32);
+        return readWords(menuData, DATA_PLAYER_DEBT_WORD_0, 4);
     }
 
     public int getReconstructionTotal() {
@@ -902,9 +908,7 @@ public class SettlementMenu extends AbstractContainerMenu {
     }
 
     public long getSelectedResidentPermissionMask() {
-        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_PERMISSION_MASK_LOW));
-        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_PERMISSION_MASK_HIGH));
-        return low | (high << 32);
+        return readWords(menuData, DATA_SELECTED_RESIDENT_PERMISSION_WORD_0, 2);
     }
 
     public boolean selectedResidentHasPermission(SettlementPermission permission) {
@@ -916,15 +920,11 @@ public class SettlementMenu extends AbstractContainerMenu {
     }
 
     public long getSelectedResidentPersonalTaxAmount() {
-        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_PERSONAL_TAX_LOW));
-        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_PERSONAL_TAX_HIGH));
-        return low | (high << 32);
+        return readWords(menuData, DATA_SELECTED_RESIDENT_PERSONAL_TAX_WORD_0, 4);
     }
 
     public long getSelectedResidentPersonalDebt() {
-        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_DEBT_LOW));
-        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_RESIDENT_DEBT_HIGH));
-        return low | (high << 32);
+        return readWords(menuData, DATA_SELECTED_RESIDENT_DEBT_WORD_0, 4);
     }
 
     public int getSelectedResidentShopTaxPercent() {
@@ -1232,7 +1232,8 @@ public class SettlementMenu extends AbstractContainerMenu {
 
                 selectedResident.setPersonalTaxAmount(updatedTax);
                 data.setDirty();
-                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                syncMenuState();
+                refreshOtherOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
@@ -1264,7 +1265,8 @@ public class SettlementMenu extends AbstractContainerMenu {
 
                 selectedResident.setShopTaxPercent(updatedShopTax);
                 data.setDirty();
-                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                syncMenuState();
+                refreshOtherOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
@@ -1320,7 +1322,8 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
 
                 data.setDirty();
-                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                syncMenuState();
+                refreshOtherOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
@@ -1358,6 +1361,29 @@ public class SettlementMenu extends AbstractContainerMenu {
 
         List<ServerPlayer> players = sourcePlayer.server.getPlayerList().getPlayers();
         for (ServerPlayer online : players) {
+            if (!(online.containerMenu instanceof SettlementMenu)) {
+                continue;
+            }
+
+            SettlementMenu openMenu = (SettlementMenu) online.containerMenu;
+            if (!settlementId.equals(openMenu.getSettlementId())) {
+                continue;
+            }
+
+            openMenu.reopenFor(online);
+        }
+    }
+
+    private static void refreshOtherOpenMenusForSettlement(ServerPlayer sourcePlayer, UUID settlementId) {
+        if (sourcePlayer == null || sourcePlayer.server == null || settlementId == null) {
+            return;
+        }
+
+        List<ServerPlayer> players = sourcePlayer.server.getPlayerList().getPlayers();
+        for (ServerPlayer online : players) {
+            if (online == sourcePlayer) {
+                continue;
+            }
             if (!(online.containerMenu instanceof SettlementMenu)) {
                 continue;
             }

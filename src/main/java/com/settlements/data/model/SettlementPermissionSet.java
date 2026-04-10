@@ -10,53 +10,63 @@ import java.util.EnumSet;
 import java.util.Set;
 
 public class SettlementPermissionSet {
-    private final EnumSet<SettlementPermission> permissions = EnumSet.noneOf(SettlementPermission.class);
+    private final EnumSet<SettlementPermission> permissions;
+
+    public SettlementPermissionSet() {
+        this.permissions = EnumSet.noneOf(SettlementPermission.class);
+    }
 
     public boolean has(SettlementPermission permission) {
-        return permissions.contains(permission);
+        return permission != null && permissions.contains(permission);
     }
 
     public void grant(SettlementPermission permission) {
+        if (permission == null) {
+            return;
+        }
         permissions.add(permission);
     }
 
     public void revoke(SettlementPermission permission) {
+        if (permission == null) {
+            return;
+        }
         permissions.remove(permission);
     }
 
-    public void clear() {
-        permissions.clear();
-    }
-
     public Set<SettlementPermission> asReadOnlySet() {
-        return Collections.unmodifiableSet(permissions);
+        if (permissions.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return Collections.unmodifiableSet(EnumSet.copyOf(permissions));
     }
 
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
-        ListTag listTag = new ListTag();
 
+        ListTag permissionsTag = new ListTag();
         for (SettlementPermission permission : permissions) {
-            listTag.add(StringTag.valueOf(permission.name()));
+            permissionsTag.add(StringTag.valueOf(permission.name()));
         }
 
-        tag.put("Permissions", listTag);
+        tag.put("Permissions", permissionsTag);
         return tag;
     }
 
     public static SettlementPermissionSet load(CompoundTag tag) {
         SettlementPermissionSet set = new SettlementPermissionSet();
-
-        if (tag == null || !tag.contains("Permissions", Tag.TAG_LIST)) {
+        if (tag == null) {
             return set;
         }
 
-        ListTag listTag = tag.getList("Permissions", Tag.TAG_STRING);
-        for (int i = 0; i < listTag.size(); i++) {
-            String raw = listTag.getString(i);
-            try {
-                set.grant(SettlementPermission.valueOf(raw));
-            } catch (IllegalArgumentException ignored) {
+        if (tag.contains("Permissions", Tag.TAG_LIST)) {
+            ListTag permissionsTag = tag.getList("Permissions", Tag.TAG_STRING);
+            for (int i = 0; i < permissionsTag.size(); i++) {
+                String name = permissionsTag.getString(i);
+                try {
+                    set.grant(SettlementPermission.valueOf(name));
+                } catch (IllegalArgumentException ignored) {
+                }
             }
         }
 

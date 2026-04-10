@@ -394,8 +394,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         }
 
         boolean residentsTab = selectedTab == SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab();
-        boolean hasSelectedResident = residentsTab && menu.getSelectedResidentView() != null;
-        boolean selectedResidentLeaderLocal = hasSelectedResident && menu.getSelectedResidentView().isLeader();
+        boolean hasSelectedResident = residentsTab && menu.hasSelectedResident();
+        boolean selectedResidentLeaderLocal = hasSelectedResident && menu.isSelectedResidentLeader();
 
         residentTaxesModeButton.visible = residentsTab;
         residentPermissionsModeButton.visible = residentsTab && menu.canViewResidentPermissionPage();
