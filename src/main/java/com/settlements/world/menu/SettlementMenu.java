@@ -398,33 +398,24 @@ public class SettlementMenu extends AbstractContainerMenu {
             }
 
             private boolean canEditSelectedResidentPermissions(Settlement settlement, SettlementMember self, SettlementMember target) {
-                if (settlement == null || self == null || target == null || target.isLeader()) {
+                if (!(playerInventory.player instanceof ServerPlayer)) {
                     return false;
                 }
-                if (settlement.isLeader(playerInventory.player.getUUID())) {
-                    return true;
-                }
-                return self.getPermissionSet().has(SettlementPermission.GRANT_PERMISSIONS);
+                return SettlementMenu.canEditResidentPermissions((ServerPlayer) playerInventory.player, settlement, self, target);
             }
 
             private boolean canEditSelectedResidentPersonalTax(Settlement settlement, SettlementMember self, SettlementMember target) {
-                if (settlement == null || self == null || target == null || target.isLeader()) {
+                if (!(playerInventory.player instanceof ServerPlayer)) {
                     return false;
                 }
-                if (settlement.isLeader(playerInventory.player.getUUID())) {
-                    return true;
-                }
-                return self.getPermissionSet().has(SettlementPermission.CHANGE_PLAYER_TAX);
+                return SettlementMenu.canEditResidentPersonalTax((ServerPlayer) playerInventory.player, settlement, self, target);
             }
 
             private boolean canEditSelectedResidentShopTax(Settlement settlement, SettlementMember self, SettlementMember target) {
-                if (settlement == null || self == null || target == null || target.isLeader()) {
+                if (!(playerInventory.player instanceof ServerPlayer)) {
                     return false;
                 }
-                if (settlement.isLeader(playerInventory.player.getUUID())) {
-                    return true;
-                }
-                return self.getPermissionSet().has(SettlementPermission.CHANGE_PLAYER_SHOP_TAX);
+                return SettlementMenu.canEditResidentShopTax((ServerPlayer) playerInventory.player, settlement, self, target);
             }
 
             private boolean canStopReconstruction(Settlement settlement, ReconstructionSession reconstruction) {
@@ -1005,7 +996,24 @@ public class SettlementMenu extends AbstractContainerMenu {
     public void clientMarkReconstructionEntrySkipped(int oneBasedIndex) {
         clientSetReconstructionEntrySkipped(oneBasedIndex, true);
     }
+    private static boolean isSettlementLeader(Settlement settlement, UUID playerUuid) {
+        return settlement != null && playerUuid != null && settlement.isLeader(playerUuid);
+    }
 
+    private static boolean hasSettlementPermission(
+            Settlement settlement,
+            SettlementMember member,
+            UUID playerUuid,
+            SettlementPermission permission
+    ) {
+        if (permission == null) {
+            return false;
+        }
+        if (isSettlementLeader(settlement, playerUuid)) {
+            return true;
+        }
+        return member != null && member.getPermissionSet().has(permission);
+    }
     private SettlementMember resolveSelectedResidentFromViews(Settlement settlement) {
         if (settlement == null) {
             return null;
@@ -1235,33 +1243,52 @@ public class SettlementMenu extends AbstractContainerMenu {
     }
 
     private static boolean canEditResidentPermissions(ServerPlayer actor, Settlement settlement, SettlementMember self, SettlementMember target) {
-        if (settlement == null || self == null || target == null || target.isLeader()) {
+        if (actor == null || settlement == null || target == null || target.isLeader()) {
             return false;
         }
-        if (settlement.isLeader(actor.getUUID())) {
-            return true;
-        }
-        return self.getPermissionSet().has(SettlementPermission.GRANT_PERMISSIONS);
+
+        return hasSettlementPermission(
+                settlement,
+                self,
+                actor.getUUID(),
+                SettlementPermission.GRANT_PERMISSIONS
+        );
     }
 
     private static boolean canEditResidentPersonalTax(ServerPlayer actor, Settlement settlement, SettlementMember self, SettlementMember target) {
-        if (settlement == null || self == null || target == null || target.isLeader()) {
+        if (actor == null || settlement == null || target == null || target.isLeader()) {
             return false;
         }
-        if (settlement.isLeader(actor.getUUID())) {
-            return true;
-        }
-        return self.getPermissionSet().has(SettlementPermission.CHANGE_PLAYER_TAX);
+
+        return hasSettlementPermission(
+                settlement,
+                self,
+                actor.getUUID(),
+                SettlementPermission.CHANGE_PLAYER_TAX
+        ) || hasSettlementPermission(
+                settlement,
+                self,
+                actor.getUUID(),
+                SettlementPermission.GRANT_PERMISSIONS
+        );
     }
 
     private static boolean canEditResidentShopTax(ServerPlayer actor, Settlement settlement, SettlementMember self, SettlementMember target) {
-        if (settlement == null || self == null || target == null || target.isLeader()) {
+        if (actor == null || settlement == null || target == null || target.isLeader()) {
             return false;
         }
-        if (settlement.isLeader(actor.getUUID())) {
-            return true;
-        }
-        return self.getPermissionSet().has(SettlementPermission.CHANGE_PLAYER_SHOP_TAX);
+
+        return hasSettlementPermission(
+                settlement,
+                self,
+                actor.getUUID(),
+                SettlementPermission.CHANGE_PLAYER_SHOP_TAX
+        ) || hasSettlementPermission(
+                settlement,
+                self,
+                actor.getUUID(),
+                SettlementPermission.GRANT_PERMISSIONS
+        );
     }
 
     private static boolean canOpenReconstructionStorage(ServerPlayer actor, Settlement settlement, SettlementMember self, ReconstructionSession reconstruction) {
