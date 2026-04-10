@@ -1,10 +1,8 @@
 package com.settlements.client.screen;
 
-import com.settlements.data.model.SettlementPermission;
 import com.settlements.world.menu.SettlementMenu;
 import com.settlements.world.menu.SettlementMenuTab;
 import com.settlements.world.menu.SettlementReconstructionEntryView;
-import com.settlements.world.menu.SettlementResidentView;
 import com.settlements.world.menu.SettlementWarView;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -19,32 +17,14 @@ import java.util.Map;
 
 public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     private static final int LIST_ROWS = 7;
-    private static final int PERMISSION_ROWS = 6;
 
     private Button overviewTabButton;
-    private Button residentsTabButton;
     private Button warTabButton;
     private Button reconstructionTabButton;
     private Button prevPageButton;
     private Button nextPageButton;
 
     private final Button[] listButtons = new Button[LIST_ROWS];
-    private final Button[] permissionButtons = new Button[PERMISSION_ROWS];
-    private final int[] visiblePermissionOrdinals = new int[PERMISSION_ROWS];
-
-    private Button residentTaxesModeButton;
-    private Button residentPermissionsModeButton;
-    private Button permissionPrevButton;
-    private Button permissionNextButton;
-
-    private Button personalTaxMinus100Button;
-    private Button personalTaxMinus10Button;
-    private Button personalTaxPlus10Button;
-    private Button personalTaxPlus100Button;
-    private Button shopTaxMinus10Button;
-    private Button shopTaxMinus1Button;
-    private Button shopTaxPlus1Button;
-    private Button shopTaxPlus10Button;
 
     private Button reconstructionResourcesModeButton;
     private Button reconstructionBlocksModeButton;
@@ -52,12 +32,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     private Button restoreButton;
     private Button stopReconstructionButton;
 
-    private int residentPage;
     private int warPage;
-    private int reconstructionResourcePage;
-    private int reconstructionBlockPage;
-    private int permissionPage;
-    private ResidentPanelMode residentPanelMode = ResidentPanelMode.TAXES;
+    private int reconstructionPage;
     private ReconstructionPanelMode reconstructionPanelMode = ReconstructionPanelMode.RESOURCES;
     private String selectedResourceKey;
 
@@ -72,8 +48,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     protected void containerTick() {
         super.containerTick();
 
-        this.residentPage = menu.getResidentPage();
         this.warPage = menu.getWarPage();
+        this.reconstructionPage = menu.getReconstructionPage();
 
         ensureSelections();
         updateButtons();
@@ -87,16 +63,15 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         int top = this.topPos;
 
         overviewTabButton = Button.builder(Component.literal("Обзор"), button -> pressButton(SettlementMenu.BUTTON_TAB_OVERVIEW))
-                .bounds(left + 8, top + 6, 82, 20)
+                .bounds(left + 8, top + 6, 110, 20)
                 .build();
-        residentsTabButton = Button.builder(Component.literal("Жители"), button -> pressButton(SettlementMenu.BUTTON_TAB_RESIDENTS))
-                .bounds(left + 94, top + 6, 82, 20)
-                .build();
+
         warTabButton = Button.builder(Component.literal("Война"), button -> pressButton(SettlementMenu.BUTTON_TAB_WAR))
-                .bounds(left + 180, top + 6, 82, 20)
+                .bounds(left + 122, top + 6, 110, 20)
                 .build();
+
         reconstructionTabButton = Button.builder(Component.literal("Реконструкция"), button -> pressButton(SettlementMenu.BUTTON_TAB_RECONSTRUCTION))
-                .bounds(left + 266, top + 6, 86, 20)
+                .bounds(left + 236, top + 6, 116, 20)
                 .build();
 
         prevPageButton = Button.builder(Component.literal("<"), button -> pressButton(SettlementMenu.BUTTON_PAGE_PREV))
@@ -108,7 +83,6 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 .build();
 
         addRenderableWidget(overviewTabButton);
-        addRenderableWidget(residentsTabButton);
         addRenderableWidget(warTabButton);
         addRenderableWidget(reconstructionTabButton);
         addRenderableWidget(prevPageButton);
@@ -124,66 +98,22 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             addRenderableWidget(listButtons[i]);
         }
 
-        residentTaxesModeButton = Button.builder(Component.literal("Налоги"), button -> residentPanelMode = ResidentPanelMode.TAXES)
-                .bounds(left + 140, top + 56, 72, 18)
-                .build();
-        residentPermissionsModeButton = Button.builder(Component.literal("Права"), button -> residentPanelMode = ResidentPanelMode.PERMISSIONS)
-                .bounds(left + 216, top + 56, 72, 18)
-                .build();
-        permissionPrevButton = Button.builder(Component.literal("<"), button -> permissionPage = Math.max(0, permissionPage - 1))
-                .bounds(left + 292, top + 56, 24, 18)
-                .build();
-        permissionNextButton = Button.builder(Component.literal(">"), button -> permissionPage++)
-                .bounds(left + 320, top + 56, 24, 18)
-                .build();
-
-        addRenderableWidget(residentTaxesModeButton);
-        addRenderableWidget(residentPermissionsModeButton);
-        addRenderableWidget(permissionPrevButton);
-        addRenderableWidget(permissionNextButton);
-
-        int permissionButtonX = left + 288;
-        int permissionButtonY = top + 82;
-        for (int i = 0; i < PERMISSION_ROWS; i++) {
-            final int row = i;
-            visiblePermissionOrdinals[i] = -1;
-            permissionButtons[i] = Button.builder(Component.literal("Выкл"), button -> toggleVisiblePermission(row))
-                    .bounds(permissionButtonX, permissionButtonY + i * 14, 56, 12)
-                    .build();
-            addRenderableWidget(permissionButtons[i]);
-        }
-
-        personalTaxMinus100Button = smallButton(left + 156, top + 128, "-100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_100));
-        personalTaxMinus10Button = smallButton(left + 205, top + 128, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_10));
-        personalTaxPlus10Button = smallButton(left + 254, top + 128, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_10));
-        personalTaxPlus100Button = smallButton(left + 303, top + 128, "+100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_100));
-
-        shopTaxMinus10Button = smallButton(left + 156, top + 150, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_10));
-        shopTaxMinus1Button = smallButton(left + 205, top + 150, "-1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_1));
-        shopTaxPlus1Button = smallButton(left + 254, top + 150, "+1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_1));
-        shopTaxPlus10Button = smallButton(left + 303, top + 150, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_10));
-
-        addRenderableWidget(personalTaxMinus100Button);
-        addRenderableWidget(personalTaxMinus10Button);
-        addRenderableWidget(personalTaxPlus10Button);
-        addRenderableWidget(personalTaxPlus100Button);
-        addRenderableWidget(shopTaxMinus10Button);
-        addRenderableWidget(shopTaxMinus1Button);
-        addRenderableWidget(shopTaxPlus1Button);
-        addRenderableWidget(shopTaxPlus10Button);
-
         reconstructionResourcesModeButton = Button.builder(Component.literal("Нужные блоки"), button -> reconstructionPanelMode = ReconstructionPanelMode.RESOURCES)
                 .bounds(left + 140, top + 56, 96, 18)
                 .build();
+
         reconstructionBlocksModeButton = Button.builder(Component.literal("Координаты"), button -> reconstructionPanelMode = ReconstructionPanelMode.BLOCKS)
                 .bounds(left + 240, top + 56, 86, 18)
                 .build();
+
         openStorageButton = Button.builder(Component.literal("Открыть склад"), button -> pressButton(SettlementMenu.BUTTON_OPEN_RECONSTRUCTION_STORAGE))
                 .bounds(left + 140, top + 82, 124, 18)
                 .build();
+
         restoreButton = Button.builder(Component.literal("Восстановить"), button -> pressButton(SettlementMenu.BUTTON_RESTORE_RECONSTRUCTION))
                 .bounds(left + 268, top + 82, 84, 18)
                 .build();
+
         stopReconstructionButton = Button.builder(Component.literal("Остановить"), button -> {
                     pressButton(SettlementMenu.BUTTON_STOP_RECONSTRUCTION);
                     reconstructionPanelMode = ReconstructionPanelMode.RESOURCES;
@@ -200,34 +130,9 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         updateButtons();
     }
 
-    private Button smallButton(int x, int y, String label, Button.OnPress onPress) {
-        return Button.builder(Component.literal(label), onPress)
-                .bounds(x, y, 45, 14)
-                .build();
-    }
-
     private void pressButton(int buttonId) {
         if (this.minecraft != null && this.minecraft.gameMode != null) {
             this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, buttonId);
-        }
-    }
-
-    private void stepPage(int delta) {
-        SettlementMenuTab tab = menu.getSelectedTab();
-        if (tab == SettlementMenuTab.RESIDENTS) {
-            residentPage = clampPage(residentPage + delta, getResidentMaxPage());
-            return;
-        }
-        if (tab == SettlementMenuTab.WAR) {
-            warPage = clampPage(warPage + delta, getWarMaxPage());
-            return;
-        }
-        if (tab == SettlementMenuTab.RECONSTRUCTION) {
-            if (reconstructionPanelMode == ReconstructionPanelMode.BLOCKS) {
-                reconstructionBlockPage = clampPage(reconstructionBlockPage + delta, getReconstructionBlockMaxPage());
-            } else {
-                reconstructionResourcePage = clampPage(reconstructionResourcePage + delta, getReconstructionResourceMaxPage());
-            }
         }
     }
 
@@ -241,53 +146,34 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     private void handleListRowClick(int row) {
         SettlementMenuTab tab = menu.getSelectedTab();
 
-        if (tab == SettlementMenuTab.RESIDENTS) {
-            if (!menu.canAccessResidentsTab()) {
-                return;
-            }
+        if (tab != SettlementMenuTab.RECONSTRUCTION) {
+            return;
+        }
 
-            int index = residentPage * LIST_ROWS + row;
-            if (index >= 0 && index < menu.getResidentViews().size()) {
-                pressButton(SettlementMenu.BUTTON_SELECT_RESIDENT_BASE + row);
+        if (reconstructionPanelMode == ReconstructionPanelMode.RESOURCES) {
+            List<ReconstructionResourceSummary> resources = getResourceSummaries();
+            int index = reconstructionPage * LIST_ROWS + row;
+            if (index >= 0 && index < resources.size()) {
+                selectedResourceKey = resources.get(index).itemId;
+                reconstructionPanelMode = ReconstructionPanelMode.BLOCKS;
             }
             return;
         }
 
-        if (tab == SettlementMenuTab.RECONSTRUCTION) {
-            if (reconstructionPanelMode == ReconstructionPanelMode.RESOURCES) {
-                List<ReconstructionResourceSummary> resources = getResourceSummaries();
-                int index = reconstructionResourcePage * LIST_ROWS + row;
-                if (index >= 0 && index < resources.size()) {
-                    selectedResourceKey = resources.get(index).itemId;
-                    reconstructionPanelMode = ReconstructionPanelMode.BLOCKS;
-                    reconstructionBlockPage = 0;
-                }
-                return;
-            }
-
-            if (!menu.canRestoreReconstruction()) {
-                return;
-            }
-
-            List<SettlementReconstructionEntryView> blocks = getVisibleReconstructionBlocks();
-            int index = reconstructionBlockPage * LIST_ROWS + row;
-            if (index >= 0 && index < blocks.size()) {
-                SettlementReconstructionEntryView entry = blocks.get(index);
-                if (!entry.isRestored()) {
-                    boolean newSkipped = !entry.isSkipped();
-                    pressButton(SettlementMenu.BUTTON_SKIP_RECON_ENTRY_BASE + entry.getIndex());
-                    menu.clientSetReconstructionEntrySkipped(entry.getIndex(), newSkipped);
-                }
-            }
-        }
-    }
-
-    private void toggleVisiblePermission(int row) {
-        int ordinal = row >= 0 && row < visiblePermissionOrdinals.length ? visiblePermissionOrdinals[row] : -1;
-        if (ordinal < 0 || ordinal >= SettlementPermission.values().length) {
+        if (!menu.canRestoreReconstruction()) {
             return;
         }
-        pressButton(SettlementMenu.BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + ordinal);
+
+        List<SettlementReconstructionEntryView> blocks = getVisibleReconstructionBlocks();
+        int index = reconstructionPage * LIST_ROWS + row;
+        if (index >= 0 && index < blocks.size()) {
+            SettlementReconstructionEntryView entry = blocks.get(index);
+            if (!entry.isRestored()) {
+                boolean newSkipped = !entry.isSkipped();
+                pressButton(SettlementMenu.BUTTON_SKIP_RECON_ENTRY_BASE + entry.getIndex());
+                menu.clientSetReconstructionEntrySkipped(entry.getIndex(), newSkipped);
+            }
+        }
     }
 
     private void ensureSelections() {
@@ -305,17 +191,17 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             }
         } else {
             selectedResourceKey = null;
+            reconstructionPanelMode = ReconstructionPanelMode.RESOURCES;
         }
 
-        residentPage = clampPage(residentPage, getResidentMaxPage());
         warPage = clampPage(warPage, getWarMaxPage());
-        reconstructionResourcePage = clampPage(reconstructionResourcePage, getReconstructionResourceMaxPage());
-        reconstructionBlockPage = clampPage(reconstructionBlockPage, getReconstructionBlockMaxPage());
-        permissionPage = clampPage(permissionPage, getPermissionMaxPage());
+        reconstructionPage = clampPage(reconstructionPage,
+                reconstructionPanelMode == ReconstructionPanelMode.BLOCKS
+                        ? getReconstructionBlockMaxPage()
+                        : getReconstructionResourceMaxPage());
 
-        if (residentPanelMode == ResidentPanelMode.PERMISSIONS && !menu.canViewResidentPermissionPage()) {
-            residentPanelMode = ResidentPanelMode.TAXES;
-            permissionPage = 0;
+        if (reconstructionPanelMode == ReconstructionPanelMode.BLOCKS && selectedResourceKey == null) {
+            reconstructionPanelMode = ReconstructionPanelMode.RESOURCES;
         }
     }
 
@@ -323,21 +209,19 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         SettlementMenuTab selectedTab = menu.getSelectedTab();
 
         overviewTabButton.active = selectedTab != SettlementMenuTab.OVERVIEW;
-        residentsTabButton.active = selectedTab != SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab();
         warTabButton.active = selectedTab != SettlementMenuTab.WAR;
         reconstructionTabButton.active = selectedTab != SettlementMenuTab.RECONSTRUCTION;
 
         int currentPage = 0;
         int maxPage = 0;
-        if (selectedTab == SettlementMenuTab.RESIDENTS) {
-            currentPage = residentPage;
-            maxPage = getResidentMaxPage();
-        } else if (selectedTab == SettlementMenuTab.WAR) {
+        if (selectedTab == SettlementMenuTab.WAR) {
             currentPage = warPage;
             maxPage = getWarMaxPage();
         } else if (selectedTab == SettlementMenuTab.RECONSTRUCTION) {
-            currentPage = reconstructionPanelMode == ReconstructionPanelMode.BLOCKS ? reconstructionBlockPage : reconstructionResourcePage;
-            maxPage = reconstructionPanelMode == ReconstructionPanelMode.BLOCKS ? getReconstructionBlockMaxPage() : getReconstructionResourceMaxPage();
+            currentPage = reconstructionPage;
+            maxPage = reconstructionPanelMode == ReconstructionPanelMode.BLOCKS
+                    ? getReconstructionBlockMaxPage()
+                    : getReconstructionResourceMaxPage();
         }
 
         prevPageButton.visible = selectedTab != SettlementMenuTab.OVERVIEW;
@@ -350,24 +234,11 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             listButtons[i].active = false;
         }
 
-        if (selectedTab == SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab()) {
-            List<SettlementResidentView> residents = menu.getResidentViews();
-            for (int row = 0; row < LIST_ROWS; row++) {
-                int index = residentPage * LIST_ROWS + row;
-                if (index >= residents.size()) {
-                    continue;
-                }
-                SettlementResidentView resident = residents.get(index);
-                String label = resident.isLeader() ? "[ГЛАВА] " + resident.getDisplayName() : resident.getDisplayName();
-                listButtons[row].setMessage(Component.literal(shorten(label, 20)));
-                listButtons[row].visible = true;
-                listButtons[row].active = true;
-            }
-        } else if (selectedTab == SettlementMenuTab.RECONSTRUCTION) {
+        if (selectedTab == SettlementMenuTab.RECONSTRUCTION) {
             if (reconstructionPanelMode == ReconstructionPanelMode.RESOURCES) {
                 List<ReconstructionResourceSummary> resources = getResourceSummaries();
                 for (int row = 0; row < LIST_ROWS; row++) {
-                    int index = reconstructionResourcePage * LIST_ROWS + row;
+                    int index = reconstructionPage * LIST_ROWS + row;
                     if (index >= resources.size()) {
                         continue;
                     }
@@ -380,7 +251,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             } else {
                 List<SettlementReconstructionEntryView> entries = getVisibleReconstructionBlocks();
                 for (int row = 0; row < LIST_ROWS; row++) {
-                    int index = reconstructionBlockPage * LIST_ROWS + row;
+                    int index = reconstructionPage * LIST_ROWS + row;
                     if (index >= entries.size()) {
                         continue;
                     }
@@ -393,77 +264,17 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             }
         }
 
-        boolean residentsTab = selectedTab == SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab();
-        boolean hasSelectedResident = residentsTab && menu.hasSelectedResident();
-        boolean selectedResidentLeaderLocal = hasSelectedResident && menu.isSelectedResidentLeader();
-
-        residentTaxesModeButton.visible = residentsTab;
-        residentPermissionsModeButton.visible = residentsTab && menu.canViewResidentPermissionPage();
-
-        residentTaxesModeButton.active = residentsTab && residentPanelMode != ResidentPanelMode.TAXES;
-        residentPermissionsModeButton.active = residentsTab && menu.canViewResidentPermissionPage() && residentPanelMode != ResidentPanelMode.PERMISSIONS;
-
-        boolean permissionMode = residentsTab && residentPanelMode == ResidentPanelMode.PERMISSIONS && menu.canViewResidentPermissionPage();
-        permissionPrevButton.visible = permissionMode;
-        permissionNextButton.visible = permissionMode;
-        permissionPrevButton.active = permissionMode && permissionPage > 0;
-        permissionNextButton.active = permissionMode && permissionPage < getPermissionMaxPage();
-
-        for (int i = 0; i < PERMISSION_ROWS; i++) {
-            visiblePermissionOrdinals[i] = -1;
-            permissionButtons[i].visible = false;
-            permissionButtons[i].active = false;
-        }
-
-        if (permissionMode && hasSelectedResident) {
-            SettlementPermission[] permissions = SettlementPermission.values();
-            int start = permissionPage * PERMISSION_ROWS;
-            boolean canEditPermissions = !selectedResidentLeaderLocal && (menu.canEditSelectedResidentPermissions() || menu.isLeader());
-
-            for (int row = 0; row < PERMISSION_ROWS; row++) {
-                int index = start + row;
-                if (index >= permissions.length) {
-                    continue;
-                }
-                SettlementPermission permission = permissions[index];
-                visiblePermissionOrdinals[row] = permission.ordinal();
-                permissionButtons[row].visible = true;
-                permissionButtons[row].active = canEditPermissions;
-                permissionButtons[row].setMessage(Component.literal(menu.selectedResidentHasPermission(permission) ? "Вкл" : "Выкл"));
-            }
-        }
-
-        boolean taxesMode = residentsTab && residentPanelMode == ResidentPanelMode.TAXES;
-        personalTaxMinus100Button.visible = taxesMode;
-        personalTaxMinus10Button.visible = taxesMode;
-        personalTaxPlus10Button.visible = taxesMode;
-        personalTaxPlus100Button.visible = taxesMode;
-        shopTaxMinus10Button.visible = taxesMode;
-        shopTaxMinus1Button.visible = taxesMode;
-        shopTaxPlus1Button.visible = taxesMode;
-        shopTaxPlus10Button.visible = taxesMode;
-
-        boolean allowPersonalTaxButtons = taxesMode && hasSelectedResident && !selectedResidentLeaderLocal && (menu.canEditSelectedResidentPersonalTax() || menu.isLeader());
-        boolean allowShopTaxButtons = taxesMode && hasSelectedResident && !selectedResidentLeaderLocal && (menu.canEditSelectedResidentShopTax() || menu.isLeader());
-
-        personalTaxMinus100Button.active = allowPersonalTaxButtons;
-        personalTaxMinus10Button.active = allowPersonalTaxButtons;
-        personalTaxPlus10Button.active = allowPersonalTaxButtons;
-        personalTaxPlus100Button.active = allowPersonalTaxButtons;
-
-        shopTaxMinus10Button.active = allowShopTaxButtons;
-        shopTaxMinus1Button.active = allowShopTaxButtons;
-        shopTaxPlus1Button.active = allowShopTaxButtons;
-        shopTaxPlus10Button.active = allowShopTaxButtons;
-
         boolean reconstructionTab = selectedTab == SettlementMenuTab.RECONSTRUCTION;
         reconstructionResourcesModeButton.visible = reconstructionTab;
         reconstructionBlocksModeButton.visible = reconstructionTab;
-        reconstructionResourcesModeButton.active = reconstructionTab && reconstructionPanelMode != ReconstructionPanelMode.RESOURCES;
-        reconstructionBlocksModeButton.active = reconstructionTab && reconstructionPanelMode != ReconstructionPanelMode.BLOCKS && selectedResourceKey != null;
         openStorageButton.visible = reconstructionTab;
         restoreButton.visible = reconstructionTab;
         stopReconstructionButton.visible = reconstructionTab;
+
+        reconstructionResourcesModeButton.active = reconstructionTab && reconstructionPanelMode != ReconstructionPanelMode.RESOURCES;
+        reconstructionBlocksModeButton.active = reconstructionTab
+                && reconstructionPanelMode != ReconstructionPanelMode.BLOCKS
+                && selectedResourceKey != null;
 
         openStorageButton.active = reconstructionTab && menu.canOpenReconstructionStorage();
         restoreButton.active = reconstructionTab && menu.canRestoreReconstruction();
@@ -504,8 +315,6 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         SettlementMenuTab tab = menu.getSelectedTab();
         if (tab == SettlementMenuTab.OVERVIEW) {
             renderOverview(graphics);
-        } else if (tab == SettlementMenuTab.RESIDENTS) {
-            renderResidents(graphics);
         } else if (tab == SettlementMenuTab.WAR) {
             renderWar(graphics);
         } else if (tab == SettlementMenuTab.RECONSTRUCTION) {
@@ -560,61 +369,6 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         graphics.drawString(this.font, "Реконструкция: " + (menu.hasActiveReconstruction() ? "активна" : "нет"), x, y, 0xE0E0E0, false);
     }
 
-    private void renderResidents(GuiGraphics graphics) {
-        graphics.drawString(this.font, buildPageText(getCurrentPage(), getCurrentMaxPage()), 300, 58, 0xFFFFFF, false);
-
-        if (!menu.canAccessResidentsTab()) {
-            graphics.drawString(this.font, "Нет права просматривать жителей.", 140, 84, 0xFFB0B0, false);
-            return;
-        }
-
-        SettlementResidentView selected = menu.getSelectedResidentView();
-        if (selected == null) {
-            graphics.drawString(this.font, "Выбери жителя слева.", 140, 84, 0xDDDDDD, false);
-            return;
-        }
-
-        graphics.drawString(
-                this.font,
-                "Выбран: " + shorten(selected.getDisplayName(), 18),
-                140,
-                78,
-                selected.isLeader() ? 0xFFFF88 : 0xFFFFFF,
-                false
-        );
-
-        if (residentPanelMode == ResidentPanelMode.TAXES) {
-            graphics.drawString(this.font, "UUID: " + shorten(selected.getPlayerUuid(), 22), 140, 90, 0xC8C8C8, false);
-
-            String debtText = menu.canViewSelectedResidentDebt()
-                    ? String.valueOf(menu.getSelectedResidentPersonalDebt())
-                    : "скрыт";
-            graphics.drawString(this.font, "Личный долг: " + debtText, 140, 102, 0xFFD8A8, false);
-
-            graphics.drawString(this.font, "Личный налог: " + menu.getSelectedResidentPersonalTaxAmount(), 140, 114, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Налог магазинов: " + menu.getSelectedResidentShopTaxPercent() + "%", 140, 136, 0xFFFFFF, false);
-        } else {
-            if (!menu.canViewResidentPermissionPage()) {
-                graphics.drawString(this.font, "Нет права смотреть права жителей.", 140, 84, 0xFFB0B0, false);
-                return;
-            }
-
-            SettlementPermission[] permissions = SettlementPermission.values();
-            int start = permissionPage * PERMISSION_ROWS;
-            for (int row = 0; row < PERMISSION_ROWS; row++) {
-                int index = start + row;
-                if (index >= permissions.length) {
-                    continue;
-                }
-
-                SettlementPermission permission = permissions[index];
-                int y = 84 + row * 14;
-                int color = menu.selectedResidentHasPermission(permission) ? 0xA8FFA8 : 0xFFB0B0;
-                graphics.drawString(this.font, shorten(formatPermissionName(permission), 22), 140, y, color, false);
-            }
-        }
-    }
-
     private void renderWar(GuiGraphics graphics) {
         graphics.drawString(this.font, "Активные войны", 12, 58, 0xFFFFFF, false);
         graphics.drawString(this.font, buildPageText(getCurrentPage(), getCurrentMaxPage()), 278, 58, 0xFFFFFF, false);
@@ -667,7 +421,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 return;
             }
 
-            int previewStart = reconstructionBlockPage * LIST_ROWS;
+            int previewStart = reconstructionPage * LIST_ROWS;
             if (previewStart < blocks.size()) {
                 SettlementReconstructionEntryView entry = blocks.get(previewStart);
                 String status = entry.isRestored() ? "восстановлен" : entry.isSkipped() ? "пропущен" : "ожидает";
@@ -680,34 +434,26 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
     private int getCurrentPage() {
         SettlementMenuTab tab = menu.getSelectedTab();
-        if (tab == SettlementMenuTab.RESIDENTS) {
-            return residentPage;
-        }
         if (tab == SettlementMenuTab.WAR) {
             return warPage;
         }
         if (tab == SettlementMenuTab.RECONSTRUCTION) {
-            return reconstructionPanelMode == ReconstructionPanelMode.BLOCKS ? reconstructionBlockPage : reconstructionResourcePage;
+            return reconstructionPage;
         }
         return 0;
     }
 
     private int getCurrentMaxPage() {
         SettlementMenuTab tab = menu.getSelectedTab();
-        if (tab == SettlementMenuTab.RESIDENTS) {
-            return getResidentMaxPage();
-        }
         if (tab == SettlementMenuTab.WAR) {
             return getWarMaxPage();
         }
         if (tab == SettlementMenuTab.RECONSTRUCTION) {
-            return reconstructionPanelMode == ReconstructionPanelMode.BLOCKS ? getReconstructionBlockMaxPage() : getReconstructionResourceMaxPage();
+            return reconstructionPanelMode == ReconstructionPanelMode.BLOCKS
+                    ? getReconstructionBlockMaxPage()
+                    : getReconstructionResourceMaxPage();
         }
         return 0;
-    }
-
-    private int getResidentMaxPage() {
-        return getMaxPage(menu.getResidentViews().size(), LIST_ROWS);
     }
 
     private int getWarMaxPage() {
@@ -720,10 +466,6 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
     private int getReconstructionBlockMaxPage() {
         return getMaxPage(getVisibleReconstructionBlocks().size(), LIST_ROWS);
-    }
-
-    private int getPermissionMaxPage() {
-        return getMaxPage(SettlementPermission.values().length, PERMISSION_ROWS);
     }
 
     private int getMaxPage(int size, int pageSize) {
@@ -792,33 +534,11 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         return input.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 
-    private String formatPermissionName(SettlementPermission permission) {
-        String raw = permission.name().toLowerCase().replace('_', ' ');
-        StringBuilder builder = new StringBuilder(raw.length());
-        boolean capitalize = true;
-        for (int i = 0; i < raw.length(); i++) {
-            char c = raw.charAt(i);
-            if (capitalize && c >= 'a' && c <= 'z') {
-                builder.append((char) (c - 32));
-                capitalize = false;
-            } else {
-                builder.append(c);
-                capitalize = c == ' ';
-            }
-        }
-        return builder.toString();
-    }
-
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
         this.renderTooltip(graphics, mouseX, mouseY);
-    }
-
-    private enum ResidentPanelMode {
-        TAXES,
-        PERMISSIONS
     }
 
     private enum ReconstructionPanelMode {
