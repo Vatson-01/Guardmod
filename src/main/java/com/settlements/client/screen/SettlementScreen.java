@@ -236,6 +236,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
             int index = residentPage * LIST_ROWS + row;
             if (index >= 0 && index < menu.getResidentViews().size()) {
+                menu.clientSelectResident(index);
                 pressButton(SettlementMenu.BUTTON_SELECT_RESIDENT_BASE + index);
             }
             return;
