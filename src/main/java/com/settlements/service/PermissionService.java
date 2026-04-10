@@ -22,6 +22,10 @@ public final class PermissionService {
             return true;
         }
 
+        if (data.hasGlobalPlotAccess(player.getUUID())) {
+            return true;
+        }
+
         if (settlement.isLeader(player.getUUID())) {
             return true;
         }

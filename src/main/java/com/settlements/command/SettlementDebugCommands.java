@@ -86,6 +86,8 @@ public final class SettlementDebugCommands {
                         .then(buildSettlementMenuNode())
                         .then(buildResidentManageMenuNode())
                         .then(buildResidentsMenuNode())
+                        .then(buildTransferLeaderNode())
+                        .then(buildGlobalPlotAccessNode())
         );
     }
 
@@ -1186,6 +1188,7 @@ public final class SettlementDebugCommands {
                             SettlementService.addMember(
                                     context.getSource().getServer(),
                                     settlement.getId(),
+                                    sourcePlayer.getUUID(),
                                     target.getUUID(),
                                     sourcePlayer.level().getGameTime()
                             );
@@ -1221,6 +1224,7 @@ public final class SettlementDebugCommands {
                             SettlementService.removeMember(
                                     context.getSource().getServer(),
                                     settlement.getId(),
+                                    sourcePlayer.getUUID(),
                                     target.getUUID(),
                                     sourcePlayer.level().getGameTime()
                             );
@@ -1231,6 +1235,109 @@ public final class SettlementDebugCommands {
                             );
                             return 1;
                         }));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildTransferLeaderNode() {
+        return Commands.literal("transferleader")
+                .then(Commands.argument("settlement", StringArgumentType.string())
+                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    String settlementName = StringArgumentType.getString(context, "settlement");
+                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
+                                    Settlement settlement = data.getSettlementByName(settlementName);
+
+                                    if (settlement == null) {
+                                        source.sendFailure(Component.literal("Поселение \"" + settlementName + "\" не найдено."));
+                                        return 0;
+                                    }
+
+                                    if (!settlement.isResident(target.getUUID())) {
+                                        source.sendFailure(Component.literal(
+                                                "Игрок " + target.getGameProfile().getName()
+                                                        + " не состоит в поселении " + settlement.getName() + "."
+                                        ));
+                                        return 0;
+                                    }
+
+                                    SettlementService.transferLeader(
+                                            source.getServer(),
+                                            settlement.getId(),
+                                            target.getUUID(),
+                                            source.getServer().overworld().getGameTime()
+                                    );
+
+                                    source.sendSuccess(
+                                            () -> Component.literal(
+                                                    "Глава поселения \"" + settlement.getName()
+                                                            + "\" передан игроку " + target.getGameProfile().getName() + "."
+                                            ),
+                                            true
+                                    );
+                                    return 1;
+                                })));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildGlobalPlotAccessNode() {
+        return Commands.literal("globalplotaccess")
+                .then(Commands.literal("grant")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
+                                    data.setGlobalPlotAccess(target.getUUID(), true);
+
+                                    source.sendSuccess(
+                                            () -> Component.literal(
+                                                    "Игроку " + target.getGameProfile().getName()
+                                                            + " выдан полный доступ ко всем приватам всех поселений."
+                                            ),
+                                            true
+                                    );
+                                    return 1;
+                                })))
+                .then(Commands.literal("revoke")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
+                                    data.setGlobalPlotAccess(target.getUUID(), false);
+
+                                    source.sendSuccess(
+                                            () -> Component.literal(
+                                                    "У игрока " + target.getGameProfile().getName()
+                                                            + " снят глобальный доступ ко всем приватам."
+                                            ),
+                                            true
+                                    );
+                                    return 1;
+                                })))
+                .then(Commands.literal("check")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
+                                    boolean enabled = data.hasGlobalPlotAccess(target.getUUID());
+
+                                    source.sendSuccess(
+                                            () -> Component.literal(
+                                                    "Глобальный доступ игрока "
+                                                            + target.getGameProfile().getName()
+                                                            + ": " + (enabled ? "включен" : "выключен")
+                                            ),
+                                            false
+                                    );
+                                    return 1;
+                                })));
     }
 
     private static CompletableFuture<Suggestions> suggestSettlementNames(

@@ -14,6 +14,7 @@ import com.settlements.util.ClaimKeyUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.ChunkPos;
@@ -24,8 +25,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class SettlementSavedData extends SavedData {
@@ -56,6 +59,8 @@ public class SettlementSavedData extends SavedData {
 
     private final Map<UUID, ReconstructionSession> reconstructionsById = new LinkedHashMap<UUID, ReconstructionSession>();
     private final Map<UUID, UUID> activeReconstructionIdBySettlementId = new LinkedHashMap<UUID, UUID>();
+
+    private final Set<UUID> globalPlotAccessPlayerUuids = new LinkedHashSet<UUID>();
 
     public SettlementSavedData() {
     }
@@ -150,6 +155,17 @@ public class SettlementSavedData extends SavedData {
             }
         }
 
+        if (tag.contains("GlobalPlotAccessPlayers", Tag.TAG_LIST)) {
+            ListTag globalAccessList = tag.getList("GlobalPlotAccessPlayers", Tag.TAG_STRING);
+            for (int i = 0; i < globalAccessList.size(); i++) {
+                String rawUuid = globalAccessList.getString(i);
+                try {
+                    data.globalPlotAccessPlayerUuids.add(UUID.fromString(rawUuid));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+
         data.rebuildIndexes();
         return data;
     }
@@ -209,6 +225,12 @@ public class SettlementSavedData extends SavedData {
             shopsTag.add(shop.save());
         }
         tag.put("Shops", shopsTag);
+
+        ListTag globalPlotAccessTag = new ListTag();
+        for (UUID playerUuid : globalPlotAccessPlayerUuids) {
+            globalPlotAccessTag.add(StringTag.valueOf(playerUuid.toString()));
+        }
+        tag.put("GlobalPlotAccessPlayers", globalPlotAccessTag);
 
         return tag;
     }
@@ -291,6 +313,27 @@ public class SettlementSavedData extends SavedData {
         rebuildIndexes();
         setDirty();
         return created;
+    }
+
+    public boolean hasGlobalPlotAccess(UUID playerUuid) {
+        return playerUuid != null && globalPlotAccessPlayerUuids.contains(playerUuid);
+    }
+
+    public void setGlobalPlotAccess(UUID playerUuid, boolean enabled) {
+        if (playerUuid == null) {
+            return;
+        }
+
+        if (enabled) {
+            globalPlotAccessPlayerUuids.add(playerUuid);
+        } else {
+            globalPlotAccessPlayerUuids.remove(playerUuid);
+        }
+        setDirty();
+    }
+
+    public Collection<UUID> getGlobalPlotAccessPlayers() {
+        return Collections.unmodifiableSet(globalPlotAccessPlayerUuids);
     }
 
     public ShopRecord getShop(UUID shopId) {

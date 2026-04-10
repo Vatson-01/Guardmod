@@ -219,7 +219,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         SettlementMenuTab selectedTab = menu.getSelectedTab();
 
         overviewTabButton.active = selectedTab != SettlementMenuTab.OVERVIEW;
-        warTabButton.active = selectedTab != SettlementMenuTab.WAR;
+        warTabButton.active = menu.canViewWarStatus() && selectedTab != SettlementMenuTab.WAR;
         reconstructionTabButton.active = selectedTab != SettlementMenuTab.RECONSTRUCTION;
 
         int currentPage = 0;

@@ -71,7 +71,8 @@ public class SettlementMenu extends AbstractContainerMenu {
     private static final int DATA_CAN_STOP_RECONSTRUCTION = 23;
     private static final int DATA_CAN_VIEW_TREASURY = 24;
     private static final int DATA_CAN_VIEW_SETTLEMENT_DEBT = 25;
-    private static final int DATA_COUNT = 26;
+    private static final int DATA_CAN_VIEW_WARS = 26;
+    private static final int DATA_COUNT = 27;
 
     private final UUID settlementId;
     private final String settlementName;
@@ -150,34 +151,40 @@ public class SettlementMenu extends AbstractContainerMenu {
         String settlementName = settlement.getName();
         String leaderName = resolvePlayerName(serverPlayer, settlement.getLeaderUuid());
 
+        SettlementMember self = settlement.getMember(serverPlayer.getUUID());
+        boolean canViewWars = settlement.isLeader(serverPlayer.getUUID())
+                || (self != null && self.getPermissionSet().has(SettlementPermission.VIEW_WAR_STATUS));
+
         List<SettlementWarView> warViews = new ArrayList<SettlementWarView>();
-        List<WarRecord> activeWars = data.getActiveWarsForSettlement(settlementId);
-        SiegeState defendingSiege = data.getActiveSiegeForDefenderSettlement(settlementId);
-        SiegeState attackingSiege = data.getActiveSiegeForAttackerSettlement(settlementId);
+        if (canViewWars) {
+            List<WarRecord> activeWars = data.getActiveWarsForSettlement(settlementId);
+            SiegeState defendingSiege = data.getActiveSiegeForDefenderSettlement(settlementId);
+            SiegeState attackingSiege = data.getActiveSiegeForAttackerSettlement(settlementId);
 
-        for (WarRecord war : activeWars) {
-            UUID otherId = war.getSettlementAId().equals(settlementId)
-                    ? war.getSettlementBId()
-                    : war.getSettlementAId();
+            for (WarRecord war : activeWars) {
+                UUID otherId = war.getSettlementAId().equals(settlementId)
+                        ? war.getSettlementBId()
+                        : war.getSettlementAId();
 
-            Settlement otherSettlement = data.getSettlement(otherId);
-            String otherName = otherSettlement == null ? otherId.toString() : otherSettlement.getName();
-            String detail = "Активная война";
+                Settlement otherSettlement = data.getSettlement(otherId);
+                String otherName = otherSettlement == null ? otherId.toString() : otherSettlement.getName();
+                String detail = "Активная война";
 
-            if (defendingSiege != null && defendingSiege.getWarId().equals(war.getId())) {
-                detail = "Сейчас ваше поселение находится в осаде";
-            } else if (attackingSiege != null && attackingSiege.getWarId().equals(war.getId())) {
-                detail = "Сейчас ваше поселение ведет осаду";
-            } else if (!war.getStartReason().isEmpty()) {
-                detail = "Причина: " + war.getStartReason();
+                if (defendingSiege != null && defendingSiege.getWarId().equals(war.getId())) {
+                    detail = "Сейчас ваше поселение находится в осаде";
+                } else if (attackingSiege != null && attackingSiege.getWarId().equals(war.getId())) {
+                    detail = "Сейчас ваше поселение ведет осаду";
+                } else if (!war.getStartReason().isEmpty()) {
+                    detail = "Причина: " + war.getStartReason();
+                }
+
+                detail = detail + " | начало: " + war.getStartedAt();
+
+                warViews.add(new SettlementWarView(
+                        "Война с " + otherName,
+                        detail
+                ));
             }
-
-            detail = detail + " | начало: " + war.getStartedAt();
-
-            warViews.add(new SettlementWarView(
-                    "Война с " + otherName,
-                    detail
-            ));
         }
 
         List<SettlementReconstructionEntryView> reconstructionViews = new ArrayList<SettlementReconstructionEntryView>();
@@ -310,6 +317,10 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return hasPermission(settlement, self, SettlementPermission.VIEW_SETTLEMENT_DEBT);
             }
 
+            private boolean canViewWarStatus(Settlement settlement, SettlementMember self) {
+                return hasPermission(settlement, self, SettlementPermission.VIEW_WAR_STATUS);
+            }
+
             private boolean canStopReconstruction(Settlement settlement, ReconstructionSession reconstruction) {
                 return settlement != null
                         && reconstruction != null
@@ -440,6 +451,9 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
                 if (index == DATA_CAN_VIEW_SETTLEMENT_DEBT) {
                     return canViewSettlementDebt(settlement, self) ? 1 : 0;
+                }
+                if (index == DATA_CAN_VIEW_WARS) {
+                    return canViewWarStatus(settlement, self) ? 1 : 0;
                 }
 
                 return 0;
@@ -599,6 +613,10 @@ public class SettlementMenu extends AbstractContainerMenu {
         return menuData.get(DATA_CAN_VIEW_SETTLEMENT_DEBT) != 0;
     }
 
+    public boolean canViewWarStatus() {
+        return menuData.get(DATA_CAN_VIEW_WARS) != 0;
+    }
+
     public void clientSetReconstructionEntrySkipped(int oneBasedIndex, boolean skipped) {
         for (int i = 0; i < reconstructionViews.size(); i++) {
             SettlementReconstructionEntryView view = reconstructionViews.get(i);
@@ -620,11 +638,7 @@ public class SettlementMenu extends AbstractContainerMenu {
             broadcastChanges();
             return true;
         }
-        if (buttonId == BUTTON_TAB_WAR) {
-            menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.WAR.getIndex());
-            broadcastChanges();
-            return true;
-        }
+
         if (buttonId == BUTTON_TAB_RECONSTRUCTION) {
             menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.RECONSTRUCTION.getIndex());
             broadcastChanges();
@@ -654,6 +668,26 @@ public class SettlementMenu extends AbstractContainerMenu {
             Settlement settlement = data.getSettlement(settlementId);
             SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
             ReconstructionSession reconstruction = data.getActiveReconstructionForSettlement(settlementId);
+
+            if (buttonId == BUTTON_TAB_WAR) {
+                boolean canViewWars = settlement != null
+                        && (settlement.isLeader(serverPlayer.getUUID())
+                        || (self != null && self.getPermissionSet().has(SettlementPermission.VIEW_WAR_STATUS)));
+
+                if (!canViewWars) {
+                    menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.OVERVIEW.getIndex());
+                    broadcastChanges();
+                    serverPlayer.displayClientMessage(
+                            Component.literal("Нет права просматривать войны поселения."),
+                            true
+                    );
+                    return false;
+                }
+
+                menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.WAR.getIndex());
+                broadcastChanges();
+                return true;
+            }
 
             if (buttonId == BUTTON_STOP_RECONSTRUCTION) {
                 if (!canForceStopReconstruction(serverPlayer, settlement, reconstruction)) {
@@ -764,7 +798,20 @@ public class SettlementMenu extends AbstractContainerMenu {
 
     private void reopenFor(final ServerPlayer serverPlayer) {
         final OpenData openData = buildOpenData(serverPlayer.getInventory(), settlementId);
-        final int selectedTab = getSelectedTabIndex();
+
+        int selectedTabValue = getSelectedTabIndex();
+        SettlementSavedData data = SettlementSavedData.get(serverPlayer.server);
+        Settlement settlement = data.getSettlement(settlementId);
+        SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
+        boolean canViewWars = settlement != null
+                && (settlement.isLeader(serverPlayer.getUUID())
+                || (self != null && self.getPermissionSet().has(SettlementPermission.VIEW_WAR_STATUS)));
+
+        if (selectedTabValue == SettlementMenuTab.WAR.getIndex() && !canViewWars) {
+            selectedTabValue = SettlementMenuTab.OVERVIEW.getIndex();
+        }
+
+        final int selectedTab = selectedTabValue;
         final int warPage = getWarPage();
         final int reconstructionPage = getReconstructionPage();
 

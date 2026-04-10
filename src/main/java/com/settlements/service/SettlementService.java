@@ -55,6 +55,24 @@ public final class SettlementService {
         data.removeSettlement(settlement.getId());
     }
 
+    public static void transferLeader(MinecraftServer server, UUID settlementId, UUID newLeaderUuid, long gameTime) {
+        SettlementSavedData data = SettlementSavedData.get(server);
+        Settlement settlement = data.getSettlement(settlementId);
+
+        if (settlement == null) {
+            throw new IllegalArgumentException("Поселение не найдено.");
+        }
+        if (!settlement.isResident(newLeaderUuid)) {
+            throw new IllegalStateException("Новый глава должен быть жителем поселения.");
+        }
+        if (settlement.getLeaderUuid().equals(newLeaderUuid)) {
+            return;
+        }
+
+        settlement.transferLeader(newLeaderUuid, gameTime);
+        data.markChanged();
+    }
+
     /**
      * Новый безопасный вариант: добавление жителя с проверкой прав актёра.
      */
