@@ -41,26 +41,21 @@ public class SettlementMenu extends AbstractContainerMenu {
     public static final int BUTTON_OPEN_RECONSTRUCTION_STORAGE = 12;
     public static final int BUTTON_RESTORE_RECONSTRUCTION = 13;
 
-    public static final int BUTTON_SELECT_RESIDENT_BASE = 1000;
+    public static final int BUTTON_SELECT_RESIDENT_BASE = 20;
+    public static final int BUTTON_TOGGLE_SELECTED_PERMISSION_BASE = 100;
 
-    public static final int BUTTON_TOGGLE_SELECTED_PERMISSION_BASE = 10000;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_BASE = 20000;
-    public static final int BUTTON_SELECTED_SHOP_TAX_BASE = 30000;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 = 180;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 = 181;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 = 182;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_100 = 183;
+
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_10 = 184;
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_1 = 185;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_1 = 186;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_10 = 187;
+
     public static final int BUTTON_SKIP_RECON_ENTRY_BASE = 40000;
     public static final int BUTTON_STOP_RECONSTRUCTION = 1000000;
-
-    private static final int PERMISSION_BUTTON_STRIDE = 100;
-    private static final int TAX_BUTTON_STRIDE = 10;
-
-    public static final int PERSONAL_TAX_DELTA_MINUS_100 = 0;
-    public static final int PERSONAL_TAX_DELTA_MINUS_10 = 1;
-    public static final int PERSONAL_TAX_DELTA_PLUS_10 = 2;
-    public static final int PERSONAL_TAX_DELTA_PLUS_100 = 3;
-
-    public static final int SHOP_TAX_DELTA_MINUS_10 = 0;
-    public static final int SHOP_TAX_DELTA_MINUS_1 = 1;
-    public static final int SHOP_TAX_DELTA_PLUS_1 = 2;
-    public static final int SHOP_TAX_DELTA_PLUS_10 = 3;
 
     private static final int DATA_SELECTED_TAB = 0;
     private static final int DATA_RESIDENT_PAGE = 1;
@@ -1010,22 +1005,6 @@ public class SettlementMenu extends AbstractContainerMenu {
         clientSetReconstructionEntrySkipped(oneBasedIndex, true);
     }
 
-    public static int makeTogglePermissionButtonId(int residentIndex, int permissionOrdinal) {
-        return BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + residentIndex * PERMISSION_BUTTON_STRIDE + permissionOrdinal;
-    }
-
-    public static int makePersonalTaxButtonId(int residentIndex, int deltaCode) {
-        return BUTTON_SELECTED_PERSONAL_TAX_BASE + residentIndex * TAX_BUTTON_STRIDE + deltaCode;
-    }
-
-    public static int makeShopTaxButtonId(int residentIndex, int deltaCode) {
-        return BUTTON_SELECTED_SHOP_TAX_BASE + residentIndex * TAX_BUTTON_STRIDE + deltaCode;
-    }
-
-    private static boolean isSettlementLeader(Settlement settlement, UUID playerUuid) {
-        return settlement != null && playerUuid != null && settlement.isLeader(playerUuid);
-    }
-
     private static SettlementMember resolveResidentByOpenDataIndex(List<SettlementResidentView> views, Settlement settlement, int residentIndex) {
         if (settlement == null || views == null || residentIndex < 0 || residentIndex >= views.size()) {
             return null;
@@ -1203,7 +1182,11 @@ public class SettlementMenu extends AbstractContainerMenu {
             if (!canAccessResidentsTab()) {
                 return false;
             }
-            menuData.set(DATA_SELECTED_RESIDENT_INDEX, buttonId - BUTTON_SELECT_RESIDENT_BASE);
+            int selectedIndex = buttonId - BUTTON_SELECT_RESIDENT_BASE;
+            if (selectedIndex < 0 || selectedIndex >= residentViews.size()) {
+                return false;
+            }
+            menuData.set(DATA_SELECTED_RESIDENT_INDEX, selectedIndex);
             broadcastChanges();
             return true;
         }
@@ -1220,16 +1203,15 @@ public class SettlementMenu extends AbstractContainerMenu {
             SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
             ReconstructionSession reconstruction = data.getActiveReconstructionForSettlement(settlementId);
 
-            if (buttonId >= BUTTON_TOGGLE_SELECTED_PERMISSION_BASE && buttonId < BUTTON_SELECTED_PERSONAL_TAX_BASE) {
-                int encoded = buttonId - BUTTON_TOGGLE_SELECTED_PERMISSION_BASE;
-                int residentIndex = encoded / PERMISSION_BUTTON_STRIDE;
-                int permissionOrdinal = encoded % PERMISSION_BUTTON_STRIDE;
+            if (buttonId >= BUTTON_TOGGLE_SELECTED_PERMISSION_BASE
+                    && buttonId < BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + SettlementPermission.values().length) {
+                int permissionOrdinal = buttonId - BUTTON_TOGGLE_SELECTED_PERMISSION_BASE;
 
                 if (permissionOrdinal < 0 || permissionOrdinal >= SettlementPermission.values().length) {
                     return false;
                 }
 
-                SettlementMember selectedResident = resolveResidentByOpenDataIndex(this.residentViews, settlement, residentIndex);
+                SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
                 if (!canEditResidentPermissions(this.residentViews, serverPlayer, settlement, self, selectedResident)) {
                     throw new IllegalStateException("Нет права на изменение прав этого жителя.");
                 }
@@ -1241,67 +1223,46 @@ public class SettlementMenu extends AbstractContainerMenu {
                     selectedResident.getPermissionSet().grant(permission);
                 }
 
-                menuData.set(DATA_SELECTED_RESIDENT_INDEX, residentIndex);
                 data.setDirty();
                 refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
-            if (buttonId >= BUTTON_SELECTED_PERSONAL_TAX_BASE && buttonId < BUTTON_SELECTED_SHOP_TAX_BASE) {
-                int encoded = buttonId - BUTTON_SELECTED_PERSONAL_TAX_BASE;
-                int residentIndex = encoded / TAX_BUTTON_STRIDE;
-                int deltaCode = encoded % TAX_BUTTON_STRIDE;
-
-                SettlementMember selectedResident = resolveResidentByOpenDataIndex(this.residentViews, settlement, residentIndex);
+            if (buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_100
+                    || buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_10
+                    || buttonId == BUTTON_SELECTED_PERSONAL_TAX_PLUS_10
+                    || buttonId == BUTTON_SELECTED_PERSONAL_TAX_PLUS_100) {
+                SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
                 if (!canEditResidentPersonalTax(this.residentViews, serverPlayer, settlement, self, selectedResident)) {
                     throw new IllegalStateException("Нет права на изменение личного налога этого жителя.");
                 }
 
-                long delta;
-                if (deltaCode == PERSONAL_TAX_DELTA_MINUS_100) {
-                    delta = -100L;
-                } else if (deltaCode == PERSONAL_TAX_DELTA_MINUS_10) {
-                    delta = -10L;
-                } else if (deltaCode == PERSONAL_TAX_DELTA_PLUS_10) {
-                    delta = 10L;
-                } else if (deltaCode == PERSONAL_TAX_DELTA_PLUS_100) {
-                    delta = 100L;
-                } else {
-                    return false;
-                }
+                long delta = buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 ? -100L
+                        : buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 ? -10L
+                        : buttonId == BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 ? 10L
+                        : 100L;
 
                 selectedResident.setPersonalTaxAmount(selectedResident.getPersonalTaxAmount() + delta);
-                menuData.set(DATA_SELECTED_RESIDENT_INDEX, residentIndex);
                 data.setDirty();
                 refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
-            if (buttonId >= BUTTON_SELECTED_SHOP_TAX_BASE && buttonId < BUTTON_SKIP_RECON_ENTRY_BASE) {
-                int encoded = buttonId - BUTTON_SELECTED_SHOP_TAX_BASE;
-                int residentIndex = encoded / TAX_BUTTON_STRIDE;
-                int deltaCode = encoded % TAX_BUTTON_STRIDE;
-
-                SettlementMember selectedResident = resolveResidentByOpenDataIndex(this.residentViews, settlement, residentIndex);
+            if (buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_10
+                    || buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_1
+                    || buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_1
+                    || buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_10) {
+                SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
                 if (!canEditResidentShopTax(this.residentViews, serverPlayer, settlement, self, selectedResident)) {
                     throw new IllegalStateException("Нет права на изменение налога магазинов этого жителя.");
                 }
 
-                int delta;
-                if (deltaCode == SHOP_TAX_DELTA_MINUS_10) {
-                    delta = -10;
-                } else if (deltaCode == SHOP_TAX_DELTA_MINUS_1) {
-                    delta = -1;
-                } else if (deltaCode == SHOP_TAX_DELTA_PLUS_1) {
-                    delta = 1;
-                } else if (deltaCode == SHOP_TAX_DELTA_PLUS_10) {
-                    delta = 10;
-                } else {
-                    return false;
-                }
+                int delta = buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_10 ? -10
+                        : buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_1 ? -1
+                        : buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_1 ? 1
+                        : 10;
 
                 selectedResident.setShopTaxPercent(selectedResident.getShopTaxPercent() + delta);
-                menuData.set(DATA_SELECTED_RESIDENT_INDEX, residentIndex);
                 data.setDirty();
                 refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
