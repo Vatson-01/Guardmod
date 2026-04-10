@@ -1079,7 +1079,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                     selectedResident.getPermissionSet().grant(permission);
                 }
                 data.setDirty();
-                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                broadcastOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
@@ -1096,7 +1096,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                         : 100L;
                 selectedResident.setPersonalTaxAmount(selectedResident.getPersonalTaxAmount() + delta);
                 data.setDirty();
-                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                broadcastOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
@@ -1111,8 +1111,9 @@ public class SettlementMenu extends AbstractContainerMenu {
                         : buttonId == BUTTON_SELECTED_SHOP_TAX_MINUS_1 ? -1
                         : buttonId == BUTTON_SELECTED_SHOP_TAX_PLUS_1 ? 1
                         : 10;
+                selectedResident.setShopTaxPercent(selectedResident.getShopTaxPercent() + delta);
                 data.setDirty();
-                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                broadcastOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
@@ -1121,7 +1122,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                     throw new IllegalStateException("Нет права на принудительную остановку реконструкции.");
                 }
                 ReconstructionService.stopActive(serverPlayer);
-                reopenFor(serverPlayer);
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 serverPlayer.displayClientMessage(Component.literal("Реконструкция принудительно остановлена."), true);
                 return true;
             }
@@ -1149,7 +1150,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                     throw new IllegalStateException("Нет права запускать восстановление реконструкции.");
                 }
                 ReconstructionRestoreResult result = ReconstructionService.restoreAvailable(serverPlayer);
-                reopenFor(serverPlayer);
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 serverPlayer.displayClientMessage(
                         Component.literal(
                                 "Восстановлено: " + result.getRestored()
@@ -1170,6 +1171,27 @@ public class SettlementMenu extends AbstractContainerMenu {
 
         return false;
     }
+
+    private static void broadcastOpenMenusForSettlement(ServerPlayer sourcePlayer, UUID settlementId) {
+        if (sourcePlayer == null || sourcePlayer.server == null || settlementId == null) {
+            return;
+        }
+
+        List<ServerPlayer> players = sourcePlayer.server.getPlayerList().getPlayers();
+        for (ServerPlayer online : players) {
+            if (!(online.containerMenu instanceof SettlementMenu)) {
+                continue;
+            }
+
+            SettlementMenu openMenu = (SettlementMenu) online.containerMenu;
+            if (!settlementId.equals(openMenu.getSettlementId())) {
+                continue;
+            }
+
+            openMenu.broadcastChanges();
+        }
+    }
+
     private static void refreshOpenMenusForSettlement(ServerPlayer sourcePlayer, UUID settlementId) {
         if (sourcePlayer == null || sourcePlayer.server == null || settlementId == null) {
             return;
@@ -1189,6 +1211,7 @@ public class SettlementMenu extends AbstractContainerMenu {
             openMenu.reopenFor(online);
         }
     }
+
     private static boolean canEditResidentPermissions(ServerPlayer actor, Settlement settlement, SettlementMember self, SettlementMember target) {
         if (settlement == null || self == null || target == null || target.isLeader()) {
             return false;
@@ -1405,21 +1428,6 @@ public class SettlementMenu extends AbstractContainerMenu {
             }
         }
 
-        private static void refreshOpenMenusForSettlement(ServerPlayer sourcePlayer, UUID settlementId) {
-            List<ServerPlayer> players = sourcePlayer.server.getPlayerList().getPlayers();
-            for (ServerPlayer online : players) {
-                if (!(online.containerMenu instanceof SettlementMenu)) {
-                    continue;
-                }
-
-                SettlementMenu openMenu = (SettlementMenu) online.containerMenu;
-                if (!settlementId.equals(openMenu.getSettlementId())) {
-                    continue;
-                }
-
-                openMenu.reopenFor(online);
-            }
-        }
         private static OpenData read(FriendlyByteBuf buf) {
             UUID settlementId = buf.readUUID();
             String settlementName = buf.readUtf();
