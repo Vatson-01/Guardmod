@@ -1079,7 +1079,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                     selectedResident.getPermissionSet().grant(permission);
                 }
                 data.setDirty();
-                broadcastOpenMenusForSettlement(serverPlayer, settlementId);
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
@@ -1096,7 +1096,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                         : 100L;
                 selectedResident.setPersonalTaxAmount(selectedResident.getPersonalTaxAmount() + delta);
                 data.setDirty();
-                broadcastOpenMenusForSettlement(serverPlayer, settlementId);
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
@@ -1113,7 +1113,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                         : 10;
                 selectedResident.setShopTaxPercent(selectedResident.getShopTaxPercent() + delta);
                 data.setDirty();
-                broadcastOpenMenusForSettlement(serverPlayer, settlementId);
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
