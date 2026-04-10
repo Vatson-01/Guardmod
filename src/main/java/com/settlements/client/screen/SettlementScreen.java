@@ -141,15 +141,15 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             addRenderableWidget(permissionButtons[i]);
         }
 
-        personalTaxMinus100Button = smallButton(left + 156, top + 128, "-100", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_100));
-        personalTaxMinus10Button = smallButton(left + 205, top + 128, "-10", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_10));
-        personalTaxPlus10Button = smallButton(left + 254, top + 128, "+10", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_10));
-        personalTaxPlus100Button = smallButton(left + 303, top + 128, "+100", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_100));
+        personalTaxMinus100Button = smallButton(left + 156, top + 128, "-100", button -> pressSelectedPersonalTaxButton(SettlementMenu.PERSONAL_TAX_DELTA_MINUS_100));
+        personalTaxMinus10Button = smallButton(left + 205, top + 128, "-10", button -> pressSelectedPersonalTaxButton(SettlementMenu.PERSONAL_TAX_DELTA_MINUS_10));
+        personalTaxPlus10Button = smallButton(left + 254, top + 128, "+10", button -> pressSelectedPersonalTaxButton(SettlementMenu.PERSONAL_TAX_DELTA_PLUS_10));
+        personalTaxPlus100Button = smallButton(left + 303, top + 128, "+100", button -> pressSelectedPersonalTaxButton(SettlementMenu.PERSONAL_TAX_DELTA_PLUS_100));
 
-        shopTaxMinus10Button = smallButton(left + 156, top + 150, "-10", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_10));
-        shopTaxMinus1Button = smallButton(left + 205, top + 150, "-1", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_1));
-        shopTaxPlus1Button = smallButton(left + 254, top + 150, "+1", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_1));
-        shopTaxPlus10Button = smallButton(left + 303, top + 150, "+10", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_10));
+        shopTaxMinus10Button = smallButton(left + 156, top + 150, "-10", button -> pressSelectedShopTaxButton(SettlementMenu.SHOP_TAX_DELTA_MINUS_10));
+        shopTaxMinus1Button = smallButton(left + 205, top + 150, "-1", button -> pressSelectedShopTaxButton(SettlementMenu.SHOP_TAX_DELTA_MINUS_1));
+        shopTaxPlus1Button = smallButton(left + 254, top + 150, "+1", button -> pressSelectedShopTaxButton(SettlementMenu.SHOP_TAX_DELTA_PLUS_1));
+        shopTaxPlus10Button = smallButton(left + 303, top + 150, "+10", button -> pressSelectedShopTaxButton(SettlementMenu.SHOP_TAX_DELTA_PLUS_10));
 
         addRenderableWidget(personalTaxMinus100Button);
         addRenderableWidget(personalTaxMinus10Button);
@@ -188,14 +188,6 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         updateButtons();
     }
 
-    private void pressResidentScopedButton(int actionButtonId) {
-        int selectedIndex = menu.getSelectedResidentIndex();
-        if (selectedIndex >= 0 && selectedIndex < menu.getResidentViews().size()) {
-            pressButton(SettlementMenu.BUTTON_SELECT_RESIDENT_BASE + selectedIndex);
-        }
-        pressButton(actionButtonId);
-    }
-
     private Button smallButton(int x, int y, String label, Button.OnPress onPress) {
         return Button.builder(Component.literal(label), onPress)
                 .bounds(x, y, 45, 14)
@@ -206,6 +198,30 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         if (this.minecraft != null && this.minecraft.gameMode != null) {
             this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, buttonId);
         }
+    }
+
+    private void pressSelectedPermissionButton(int permissionOrdinal) {
+        int selectedIndex = menu.getSelectedResidentIndex();
+        if (selectedIndex < 0 || selectedIndex >= menu.getResidentViews().size()) {
+            return;
+        }
+        pressButton(SettlementMenu.makeTogglePermissionButtonId(selectedIndex, permissionOrdinal));
+    }
+
+    private void pressSelectedPersonalTaxButton(int deltaCode) {
+        int selectedIndex = menu.getSelectedResidentIndex();
+        if (selectedIndex < 0 || selectedIndex >= menu.getResidentViews().size()) {
+            return;
+        }
+        pressButton(SettlementMenu.makePersonalTaxButtonId(selectedIndex, deltaCode));
+    }
+
+    private void pressSelectedShopTaxButton(int deltaCode) {
+        int selectedIndex = menu.getSelectedResidentIndex();
+        if (selectedIndex < 0 || selectedIndex >= menu.getResidentViews().size()) {
+            return;
+        }
+        pressButton(SettlementMenu.makeShopTaxButtonId(selectedIndex, deltaCode));
     }
 
     private void stepPage(int delta) {
@@ -284,7 +300,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         if (ordinal < 0 || ordinal >= SettlementPermission.values().length) {
             return;
         }
-        pressResidentScopedButton(SettlementMenu.BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + ordinal);
+        pressSelectedPermissionButton(ordinal);
     }
 
     @Override
@@ -398,7 +414,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         }
 
         boolean residentsTab = selectedTab == SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab();
-        boolean hasSelectedResident = residentsTab && menu.hasSelectedResident();
+        boolean hasSelectedResident = residentsTab && menu.getSelectedResidentView() != null;
+        boolean selectedResidentLeaderLocal = hasSelectedResident && menu.getSelectedResidentView().isLeader();
 
         residentTaxesModeButton.visible = residentsTab;
         residentPermissionsModeButton.visible = residentsTab && menu.canViewResidentPermissionPage();
@@ -421,6 +438,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         if (permissionMode && hasSelectedResident) {
             SettlementPermission[] permissions = SettlementPermission.values();
             int start = permissionPage * PERMISSION_ROWS;
+            boolean canEditPermissions = !selectedResidentLeaderLocal && (menu.canEditSelectedResidentPermissions() || menu.isLeader());
+
             for (int row = 0; row < PERMISSION_ROWS; row++) {
                 int index = start + row;
                 if (index >= permissions.length) {
@@ -429,11 +448,10 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 SettlementPermission permission = permissions[index];
                 visiblePermissionOrdinals[row] = permission.ordinal();
                 permissionButtons[row].visible = true;
-                permissionButtons[row].active = !menu.isSelectedResidentLeader();
+                permissionButtons[row].active = canEditPermissions;
                 permissionButtons[row].setMessage(Component.literal(menu.selectedResidentViewHasPermission(permission) ? "Вкл" : "Выкл"));
             }
         }
-
 
         boolean taxesMode = residentsTab && residentPanelMode == ResidentPanelMode.TAXES;
         personalTaxMinus100Button.visible = taxesMode;
@@ -445,8 +463,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         shopTaxPlus1Button.visible = taxesMode;
         shopTaxPlus10Button.visible = taxesMode;
 
-        boolean allowPersonalTaxButtons = taxesMode && menu.hasSelectedResident() && !menu.isSelectedResidentLeader();
-        boolean allowShopTaxButtons = taxesMode && menu.hasSelectedResident() && !menu.isSelectedResidentLeader();
+        boolean allowPersonalTaxButtons = taxesMode && hasSelectedResident && !selectedResidentLeaderLocal && (menu.canEditSelectedResidentPersonalTax() || menu.isLeader());
+        boolean allowShopTaxButtons = taxesMode && hasSelectedResident && !selectedResidentLeaderLocal && (menu.canEditSelectedResidentShopTax() || menu.isLeader());
 
         personalTaxMinus100Button.active = allowPersonalTaxButtons;
         personalTaxMinus10Button.active = allowPersonalTaxButtons;
@@ -570,8 +588,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             return;
         }
 
-        SettlementResidentView selected = menu.getResidentViewByIndex(menu.getSelectedResidentIndex());
-        if (selected == null || !menu.hasSelectedResident()) {
+        SettlementResidentView selected = menu.getSelectedResidentView();
+        if (selected == null) {
             graphics.drawString(this.font, "Выбери жителя слева.", 140, 84, 0xDDDDDD, false);
             return;
         }
