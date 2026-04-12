@@ -1,6 +1,7 @@
 package com.settlements.client.screen;
 
 import com.settlements.data.model.PlotPermission;
+import com.settlements.network.PlotMenuPackets;
 import com.settlements.world.menu.PlotMenu;
 import com.settlements.world.menu.PlotPlayerView;
 import net.minecraft.client.gui.GuiGraphics;
@@ -50,7 +51,7 @@ public class PlotScreen extends AbstractContainerScreen<PlotMenu> {
                 .bounds(left + 132, top + 34, 24, 18)
                 .build();
 
-        backButton = Button.builder(Component.literal("Назад"), button -> pressButton(PlotMenu.BUTTON_BACK_TO_SETTLEMENT))
+        backButton = Button.builder(Component.literal("Назад"), button -> sendBackAction())
                 .bounds(left + 282, top + 34, 60, 18)
                 .build();
 
@@ -68,31 +69,31 @@ public class PlotScreen extends AbstractContainerScreen<PlotMenu> {
             addRenderableWidget(playerButtons[i]);
         }
 
-        assignButton = Button.builder(Component.literal("Назначить"), button -> pressButton(PlotMenu.BUTTON_ASSIGN_SELECTED))
+        assignButton = Button.builder(Component.literal("Назначить"), button -> sendAssignAction())
                 .bounds(left + 176, top + 124, 80, 18)
                 .build();
 
-        unassignButton = Button.builder(Component.literal("Сделать общим"), button -> pressButton(PlotMenu.BUTTON_UNASSIGN))
+        unassignButton = Button.builder(Component.literal("Сделать общим"), button -> sendUnassignAction())
                 .bounds(left + 262, top + 124, 80, 18)
                 .build();
 
-        buildButton = Button.builder(Component.empty(), button -> pressButton(PlotMenu.BUTTON_TOGGLE_BUILD))
+        buildButton = Button.builder(Component.empty(), button -> sendTogglePermissionAction(PlotPermission.BUILD))
                 .bounds(left + 176, top + 146, 80, 16)
                 .build();
 
-        breakButton = Button.builder(Component.empty(), button -> pressButton(PlotMenu.BUTTON_TOGGLE_BREAK))
+        breakButton = Button.builder(Component.empty(), button -> sendTogglePermissionAction(PlotPermission.BREAK))
                 .bounds(left + 262, top + 146, 80, 16)
                 .build();
 
-        openDoorsButton = Button.builder(Component.empty(), button -> pressButton(PlotMenu.BUTTON_TOGGLE_OPEN_DOORS))
+        openDoorsButton = Button.builder(Component.empty(), button -> sendTogglePermissionAction(PlotPermission.OPEN_DOORS))
                 .bounds(left + 176, top + 166, 80, 16)
                 .build();
 
-        redstoneButton = Button.builder(Component.empty(), button -> pressButton(PlotMenu.BUTTON_TOGGLE_USE_REDSTONE))
+        redstoneButton = Button.builder(Component.empty(), button -> sendTogglePermissionAction(PlotPermission.USE_REDSTONE))
                 .bounds(left + 262, top + 166, 80, 16)
                 .build();
 
-        containersButton = Button.builder(Component.empty(), button -> pressButton(PlotMenu.BUTTON_TOGGLE_OPEN_CONTAINERS))
+        containersButton = Button.builder(Component.empty(), button -> sendTogglePermissionAction(PlotPermission.OPEN_CONTAINERS))
                 .bounds(left + 176, top + 186, 166, 16)
                 .build();
 
@@ -117,6 +118,30 @@ public class PlotScreen extends AbstractContainerScreen<PlotMenu> {
         if (this.minecraft != null && this.minecraft.gameMode != null) {
             this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, buttonId);
         }
+    }
+
+    private void sendBackAction() {
+        PlotMenuPackets.sendBack(this.menu);
+    }
+
+    private void sendAssignAction() {
+        PlotPlayerView selected = this.menu.getSelectedPlayerView();
+        if (selected == null) {
+            return;
+        }
+        PlotMenuPackets.sendAssign(this.menu, selected.getPlayerUuid());
+    }
+
+    private void sendUnassignAction() {
+        PlotMenuPackets.sendUnassign(this.menu);
+    }
+
+    private void sendTogglePermissionAction(PlotPermission permission) {
+        PlotPlayerView selected = this.menu.getSelectedPlayerView();
+        if (selected == null || permission == null) {
+            return;
+        }
+        PlotMenuPackets.sendTogglePermission(this.menu, selected.getPlayerUuid(), permission);
     }
 
     private void updateButtons() {

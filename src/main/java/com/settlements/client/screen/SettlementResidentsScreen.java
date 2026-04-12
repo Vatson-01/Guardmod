@@ -14,6 +14,7 @@ public class SettlementResidentsScreen extends AbstractContainerScreen<Settlemen
     private final Button[] residentButtons = new Button[SettlementResidentsMenu.PAGE_SIZE];
     private Button prevPageButton;
     private Button nextPageButton;
+    private Button backButton;
     private int page;
 
     public SettlementResidentsScreen(SettlementResidentsMenu menu, Inventory inventory, Component title) {
@@ -31,15 +32,20 @@ public class SettlementResidentsScreen extends AbstractContainerScreen<Settlemen
         int top = this.topPos;
 
         prevPageButton = Button.builder(Component.literal("<"), button -> pressButton(SettlementResidentsMenu.BUTTON_PAGE_PREV))
-                .bounds(left + 258, top + 18, 24, 18)
+                .bounds(left + 258, top + 4, 24, 18)
                 .build();
 
         nextPageButton = Button.builder(Component.literal(">"), button -> pressButton(SettlementResidentsMenu.BUTTON_PAGE_NEXT))
-                .bounds(left + 286, top + 18, 24, 18)
+                .bounds(left + 286, top + 4, 24, 18)
+                .build();
+
+        backButton = Button.builder(Component.literal("Назад"), button -> pressButton(SettlementResidentsMenu.BUTTON_BACK_TO_SETTLEMENT))
+                .bounds(left + 212, top + 4, 42, 18)
                 .build();
 
         addRenderableWidget(prevPageButton);
         addRenderableWidget(nextPageButton);
+        addRenderableWidget(backButton);
 
         int listX = left + 10;
         int listY = top + 42;

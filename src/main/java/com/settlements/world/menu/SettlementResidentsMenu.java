@@ -6,6 +6,7 @@ import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementMember;
 import com.settlements.data.model.SettlementPermission;
 import com.settlements.registry.ModMenuTypes;
+import com.settlements.service.SettlementMenuService;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -31,6 +32,7 @@ public class SettlementResidentsMenu extends AbstractContainerMenu {
 
     public static final int BUTTON_PAGE_PREV = 10;
     public static final int BUTTON_PAGE_NEXT = 11;
+    public static final int BUTTON_BACK_TO_SETTLEMENT = 12;
     public static final int BUTTON_OPEN_RESIDENT_BASE = 20;
 
     private static final int DATA_PAGE = 0;
@@ -76,7 +78,7 @@ public class SettlementResidentsMenu extends AbstractContainerMenu {
             return;
         }
 
-        if (!serverPlayer.hasPermissions(2) && !canOpenResidentsMenu(settlement, self, serverPlayer.getUUID())) {
+        if (!canOpenResidentsMenu(settlement, self, serverPlayer.getUUID())) {
             serverPlayer.displayClientMessage(Component.literal("Нет права открывать список жителей."), true);
             return;
         }
@@ -160,9 +162,7 @@ public class SettlementResidentsMenu extends AbstractContainerMenu {
                     return page;
                 }
                 if (index == DATA_CAN_OPEN) {
-                    boolean isAdmin = playerInventory.player instanceof ServerPlayer
-                            && ((ServerPlayer) playerInventory.player).hasPermissions(2);
-                    return (isAdmin || canOpenResidentsMenu(settlement, self, playerInventory.player.getUUID())) ? 1 : 0;
+                    return canOpenResidentsMenu(settlement, self, playerInventory.player.getUUID()) ? 1 : 0;
                 }
                 return 0;
             }
@@ -257,7 +257,11 @@ public class SettlementResidentsMenu extends AbstractContainerMenu {
     }
 
     private static boolean canOpenResidentsMenu(Settlement settlement, SettlementMember self, UUID actorUuid) {
-        return settlement != null && actorUuid != null && settlement.isResident(actorUuid);
+        return hasPermission(settlement, self, actorUuid, SettlementPermission.VIEW_RESIDENTS)
+                || hasPermission(settlement, self, actorUuid, SettlementPermission.GRANT_PERMISSIONS)
+                || hasPermission(settlement, self, actorUuid, SettlementPermission.CHANGE_PLAYER_TAX)
+                || hasPermission(settlement, self, actorUuid, SettlementPermission.CHANGE_PLAYER_SHOP_TAX)
+                || hasPermission(settlement, self, actorUuid, SettlementPermission.VIEW_RESIDENT_PERMISSIONS);
     }
 
     private static int getMaxPage(int size, int pageSize) {
@@ -314,8 +318,14 @@ public class SettlementResidentsMenu extends AbstractContainerMenu {
             return false;
         }
 
+        ServerPlayer serverPlayer = (ServerPlayer) player;
+
+        if (buttonId == BUTTON_BACK_TO_SETTLEMENT) {
+            SettlementMenuService.openMenu(serverPlayer, settlementId);
+            return true;
+        }
+
         if (buttonId >= BUTTON_OPEN_RESIDENT_BASE && buttonId < BUTTON_OPEN_RESIDENT_BASE + PAGE_SIZE) {
-            ServerPlayer serverPlayer = (ServerPlayer) player;
 
             int row = buttonId - BUTTON_OPEN_RESIDENT_BASE;
             int selectedIndex = getPage() * PAGE_SIZE + row;

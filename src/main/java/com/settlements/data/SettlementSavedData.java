@@ -43,6 +43,8 @@ public class SettlementSavedData extends SavedData {
     private final Map<UUID, Settlement> settlementsById = new LinkedHashMap<UUID, Settlement>();
     private final Map<String, UUID> settlementIdByNameLower = new LinkedHashMap<String, UUID>();
     private final Map<UUID, UUID> settlementIdByPlayer = new LinkedHashMap<UUID, UUID>();
+    private final Map<UUID, UUID> pendingInviteSettlementIdByPlayer = new LinkedHashMap<UUID, UUID>();
+    private final Map<UUID, UUID> pendingInviteInviterUuidByPlayer = new LinkedHashMap<UUID, UUID>();
     private final Map<String, SettlementChunkClaim> claimsByKey = new LinkedHashMap<String, SettlementChunkClaim>();
 
     private final Map<UUID, SettlementPlot> plotsById = new LinkedHashMap<UUID, SettlementPlot>();
@@ -83,6 +85,27 @@ public class SettlementSavedData extends SavedData {
                 CompoundTag settlementTag = listTag.getCompound(i);
                 Settlement settlement = Settlement.load(settlementTag);
                 data.settlementsById.put(settlement.getId(), settlement);
+            }
+        }
+
+        if (tag.contains("PendingInvites", Tag.TAG_LIST)) {
+            ListTag inviteList = tag.getList("PendingInvites", Tag.TAG_COMPOUND);
+            for (int i = 0; i < inviteList.size(); i++) {
+                CompoundTag inviteTag = inviteList.getCompound(i);
+                if (!inviteTag.hasUUID("PlayerUuid") || !inviteTag.hasUUID("SettlementId")) {
+                    continue;
+                }
+
+                UUID playerUuid = inviteTag.getUUID("PlayerUuid");
+                UUID settlementId = inviteTag.getUUID("SettlementId");
+                if (!data.settlementsById.containsKey(settlementId)) {
+                    continue;
+                }
+
+                data.pendingInviteSettlementIdByPlayer.put(playerUuid, settlementId);
+                if (inviteTag.hasUUID("InviterUuid")) {
+                    data.pendingInviteInviterUuidByPlayer.put(playerUuid, inviteTag.getUUID("InviterUuid"));
+                }
             }
         }
 
@@ -223,6 +246,21 @@ public class SettlementSavedData extends SavedData {
         }
         tag.put("Settlements", settlementsTag);
 
+        ListTag pendingInvitesTag = new ListTag();
+        for (Map.Entry<UUID, UUID> entry : pendingInviteSettlementIdByPlayer.entrySet()) {
+            CompoundTag inviteTag = new CompoundTag();
+            inviteTag.putUUID("PlayerUuid", entry.getKey());
+            inviteTag.putUUID("SettlementId", entry.getValue());
+
+            UUID inviterUuid = pendingInviteInviterUuidByPlayer.get(entry.getKey());
+            if (inviterUuid != null) {
+                inviteTag.putUUID("InviterUuid", inviterUuid);
+            }
+
+            pendingInvitesTag.add(inviteTag);
+        }
+        tag.put("PendingInvites", pendingInvitesTag);
+
         ListTag claimsTag = new ListTag();
         for (SettlementChunkClaim claim : claimsByKey.values()) {
             claimsTag.add(claim.save());
@@ -303,6 +341,49 @@ public class SettlementSavedData extends SavedData {
     public Settlement getSettlementByPlayer(UUID playerUuid) {
         UUID settlementId = settlementIdByPlayer.get(playerUuid);
         return settlementId == null ? null : settlementsById.get(settlementId);
+    }
+
+    public UUID getPendingInviteSettlementId(UUID playerUuid) {
+        return playerUuid == null ? null : pendingInviteSettlementIdByPlayer.get(playerUuid);
+    }
+
+    public Settlement getPendingInviteSettlement(UUID playerUuid) {
+        UUID settlementId = getPendingInviteSettlementId(playerUuid);
+        return settlementId == null ? null : settlementsById.get(settlementId);
+    }
+
+    public UUID getPendingInviteInviterUuid(UUID playerUuid) {
+        return playerUuid == null ? null : pendingInviteInviterUuidByPlayer.get(playerUuid);
+    }
+
+    public boolean hasPendingInvite(UUID playerUuid) {
+        return getPendingInviteSettlementId(playerUuid) != null;
+    }
+
+    public void setPendingInvite(UUID playerUuid, UUID settlementId, UUID inviterUuid) {
+        if (playerUuid == null || settlementId == null) {
+            return;
+        }
+
+        pendingInviteSettlementIdByPlayer.put(playerUuid, settlementId);
+        if (inviterUuid != null) {
+            pendingInviteInviterUuidByPlayer.put(playerUuid, inviterUuid);
+        } else {
+            pendingInviteInviterUuidByPlayer.remove(playerUuid);
+        }
+        setDirty();
+    }
+
+    public void clearPendingInvite(UUID playerUuid) {
+        if (playerUuid == null) {
+            return;
+        }
+
+        boolean removed = pendingInviteSettlementIdByPlayer.remove(playerUuid) != null;
+        removed = pendingInviteInviterUuidByPlayer.remove(playerUuid) != null || removed;
+        if (removed) {
+            setDirty();
+        }
     }
 
     public Settlement getSettlementByName(String name) {
@@ -683,6 +764,15 @@ public class SettlementSavedData extends SavedData {
 
         plotsById.entrySet().removeIf(entry -> entry.getValue().getSettlementId().equals(settlementId));
         shopsById.entrySet().removeIf(entry -> entry.getValue().getSettlementId() != null && entry.getValue().getSettlementId().equals(settlementId));
+
+        java.util.Iterator<Map.Entry<UUID, UUID>> inviteIterator = pendingInviteSettlementIdByPlayer.entrySet().iterator();
+        while (inviteIterator.hasNext()) {
+            Map.Entry<UUID, UUID> entry = inviteIterator.next();
+            if (settlementId.equals(entry.getValue())) {
+                pendingInviteInviterUuidByPlayer.remove(entry.getKey());
+                inviteIterator.remove();
+            }
+        }
 
         warsById.entrySet().removeIf(entry -> entry.getValue().involvesSettlement(settlementId));
         siegesById.entrySet().removeIf(entry -> entry.getValue().involvesSettlement(settlementId));

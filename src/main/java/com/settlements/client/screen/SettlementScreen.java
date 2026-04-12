@@ -56,6 +56,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     private Button treasuryWithdrawButton;
     private Button treasuryDepositAllButton;
     private Button plotMenuButton;
+    private Button residentsMenuButton;
 
     private int warPage;
     private int reconstructionPage;
@@ -248,8 +249,12 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 .bounds(left + 280, top + 142, 72, 16)
                 .build();
 
-        plotMenuButton = Button.builder(Component.literal("Управление участком"), button -> pressButton(SettlementMenu.BUTTON_OPEN_PLOT_MENU))
-                .bounds(left + 140, top + 160, 212, 16)
+        plotMenuButton = Button.builder(Component.literal("Участок"), button -> pressButton(SettlementMenu.BUTTON_OPEN_PLOT_MENU))
+                .bounds(left + 140, top + 160, 104, 16)
+                .build();
+
+        residentsMenuButton = Button.builder(Component.literal("Жители"), button -> pressButton(SettlementMenu.BUTTON_OPEN_RESIDENTS_MENU))
+                .bounds(left + 248, top + 160, 104, 16)
                 .build();
 
         addRenderableWidget(personalDebtMinus1000Button);
@@ -275,6 +280,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         addRenderableWidget(treasuryWithdrawButton);
         addRenderableWidget(treasuryDepositAllButton);
         addRenderableWidget(plotMenuButton);
+        addRenderableWidget(residentsMenuButton);
 
         updateButtons();
     }
@@ -460,6 +466,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         personalDebtPayAllButton.active = overviewTab && menu.getPlayerDebt() > 0L;
         plotMenuButton.visible = overviewTab;
         plotMenuButton.active = overviewTab && menu.canOpenPlotMenu();
+        residentsMenuButton.visible = overviewTab;
+        residentsMenuButton.active = overviewTab && menu.canOpenResidentsMenu();
 
         treasuryMinus1000Button.visible = treasuryTab;
         treasuryMinus100Button.visible = treasuryTab;

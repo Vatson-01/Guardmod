@@ -589,7 +589,14 @@ public class PlotMenu extends AbstractContainerMenu {
         }
 
         if (!(player instanceof ServerPlayer)) {
-            return false;
+            return buttonId == BUTTON_BACK_TO_SETTLEMENT
+                    || buttonId == BUTTON_ASSIGN_SELECTED
+                    || buttonId == BUTTON_UNASSIGN
+                    || buttonId == BUTTON_TOGGLE_BUILD
+                    || buttonId == BUTTON_TOGGLE_BREAK
+                    || buttonId == BUTTON_TOGGLE_OPEN_DOORS
+                    || buttonId == BUTTON_TOGGLE_USE_REDSTONE
+                    || buttonId == BUTTON_TOGGLE_OPEN_CONTAINERS;
         }
 
         ServerPlayer serverPlayer = (ServerPlayer) player;

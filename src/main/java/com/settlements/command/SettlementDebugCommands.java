@@ -82,6 +82,7 @@ public final class SettlementDebugCommands {
         dispatcher.register(
                 Commands.literal("settlementdebug")
                         .requires(source -> source.hasPermission(2))
+                        .then(buildHelpNode())
                         .then(buildMoneyNode())
                         .then(buildTreasuryNode())
                         .then(buildTaxNode())
@@ -105,6 +106,182 @@ public final class SettlementDebugCommands {
                         .then(buildPublicNode())
                         .then(buildGlobalPlotAccessNode())
         );
+    }
+
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildHelpNode() {
+        return Commands.literal("help")
+                .executes(context -> sendDebugHelpOverview(context.getSource()))
+                .then(Commands.literal("plot").executes(context -> sendDebugHelpPlot(context.getSource())))
+                .then(Commands.literal("treasury").executes(context -> sendDebugHelpTreasury(context.getSource())))
+                .then(Commands.literal("tax").executes(context -> sendDebugHelpTax(context.getSource())))
+                .then(Commands.literal("reconstruction").executes(context -> sendDebugHelpReconstruction(context.getSource())))
+                .then(Commands.literal("war").executes(context -> sendDebugHelpWar(context.getSource())))
+                .then(Commands.literal("siege").executes(context -> sendDebugHelpSiege(context.getSource())))
+                .then(Commands.literal("public").executes(context -> sendDebugHelpPublic(context.getSource())))
+                .then(Commands.literal("residents").executes(context -> sendDebugHelpResidents(context.getSource())))
+                .then(Commands.literal("menu").executes(context -> sendDebugHelpMenu(context.getSource())))
+                .then(Commands.literal("claim").executes(context -> sendDebugHelpClaim(context.getSource())))
+                .then(Commands.literal("shop").executes(context -> sendDebugHelpShop(context.getSource())))
+                .then(Commands.literal("admin").executes(context -> sendDebugHelpAdmin(context.getSource())));
+    }
+
+    private static int sendDebugHelpOverview(CommandSourceStack source) {
+        sendHelpHeader(source, "Settlement Debug Help");
+        sendHelpLine(source, "/settlementdebug help plot - участки и локальные права");
+        sendHelpLine(source, "/settlementdebug help treasury - казна поселения");
+        sendHelpLine(source, "/settlementdebug help tax - налоги поселения и жителей");
+        sendHelpLine(source, "/settlementdebug help reconstruction - реконструкция после осады");
+        sendHelpLine(source, "/settlementdebug help war - войны");
+        sendHelpLine(source, "/settlementdebug help siege - осады");
+        sendHelpLine(source, "/settlementdebug help public - публичные двери, контейнеры, кнопки");
+        sendHelpLine(source, "/settlementdebug help residents - жители и их меню");
+        sendHelpLine(source, "/settlementdebug help menu - debug GUI команды");
+        sendHelpLine(source, "/settlementdebug help claim - клеймы и лимит чанков");
+        sendHelpLine(source, "/settlementdebug help shop - магазины");
+        sendHelpLine(source, "/settlementdebug help admin - глобальный доступ, создание, удаление и прочее");
+        return 1;
+    }
+
+    private static int sendDebugHelpPlot(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: plot");
+        sendHelpLine(source, "/settlementdebug plot assign <player> - назначить текущий чанк личным участком игрока");
+        sendHelpLine(source, "/settlementdebug plot unassign - вернуть текущий чанк в общую территорию");
+        sendHelpLine(source, "/settlementdebug plot grant <player> <permission> - выдать локальное право на текущем участке");
+        sendHelpLine(source, "/settlementdebug plot revoke <player> <permission> - снять локальное право на текущем участке");
+        sendHelpLine(source, "/settlementdebug plot info - показать владельца участка, список чанков и локальные доступы");
+        sendHelpLine(source, "Работает по текущему чанку игрока.");
+        return 1;
+    }
+
+    private static int sendDebugHelpTreasury(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: treasury");
+        sendHelpLine(source, "/settlementdebug treasury balance - показать баланс казны");
+        sendHelpLine(source, "/settlementdebug treasury depositall - внести все монеты игрока в казну");
+        sendHelpLine(source, "/settlementdebug treasury deposit <amount> - внести сумму в казну");
+        sendHelpLine(source, "/settlementdebug treasury withdraw <amount> - вывести сумму из казны");
+        return 1;
+    }
+
+    private static int sendDebugHelpTax(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: tax");
+        sendHelpLine(source, "/settlementdebug tax info - показать налоги и долги текущего поселения");
+        sendHelpLine(source, "/settlementdebug tax settlement setland <amount> - задать налог за землю");
+        sendHelpLine(source, "/settlementdebug tax settlement setresident <amount> - задать налог за жителя");
+        sendHelpLine(source, "/settlementdebug tax settlement accrue - начислить долг поселения");
+        sendHelpLine(source, "/settlementdebug tax settlement pay <amount> - оплатить долг поселения из казны");
+        sendHelpLine(source, "/settlementdebug tax player setpersonal <player> <amount> - задать личный налог игрока");
+        sendHelpLine(source, "/settlementdebug tax player setshop <player> <percent> - задать налог магазина игрока");
+        sendHelpLine(source, "/settlementdebug tax player accrue <player> - начислить личный долг игроку");
+        sendHelpLine(source, "/settlementdebug tax player accrueall - начислить личные долги всем жителям");
+        sendHelpLine(source, "/settlementdebug tax player pay <amount> - оплатить свой личный долг");
+        return 1;
+    }
+
+    private static int sendDebugHelpReconstruction(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: reconstruction");
+        sendHelpLine(source, "/settlementdebug reconstruction info - показать статус реконструкции");
+        sendHelpLine(source, "/settlementdebug reconstruction openstorage - открыть склад реконструкции");
+        sendHelpLine(source, "/settlementdebug reconstruction deposithand - внести предмет из главной руки в склад");
+        sendHelpLine(source, "/settlementdebug reconstruction restore - восстановить доступные блоки");
+        sendHelpLine(source, "/settlementdebug reconstruction skiplooked - пропустить блок, на который смотришь");
+        sendHelpLine(source, "/settlementdebug reconstruction skipindex <index> - пропустить запись по номеру");
+        return 1;
+    }
+
+    private static int sendDebugHelpWar(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: war");
+        sendHelpLine(source, "/settlementdebug war start <settlementA> <settlementB> [reason] - начать войну");
+        sendHelpLine(source, "/settlementdebug war peace <settlementA> <settlementB> [reason] - заключить мир");
+        sendHelpLine(source, "/settlementdebug war info <settlement> - показать активные войны поселения");
+        return 1;
+    }
+
+    private static int sendDebugHelpSiege(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: siege");
+        sendHelpLine(source, "/settlementdebug siege start <attacker> <defender> [reason] - начать осаду");
+        sendHelpLine(source, "/settlementdebug siege end <attacker> <defender> [reason] - завершить осаду");
+        sendHelpLine(source, "/settlementdebug siege info <settlement> - показать статус осады поселения");
+        return 1;
+    }
+
+    private static int sendDebugHelpPublic(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: public");
+        sendHelpLine(source, "/settlementdebug public door add|remove|info - публичные двери");
+        sendHelpLine(source, "/settlementdebug public door control add|remove|info - публичные рычаги и кнопки");
+        sendHelpLine(source, "/settlementdebug public container add|remove|info - публичные контейнеры");
+        sendHelpLine(source, "/settlementdebug public list [door|control|container] - список публичных записей");
+        sendHelpLine(source, "/settlementdebug public clearchunk [door|control|container] - очистить записи в текущем чанке");
+        sendHelpLine(source, "/settlementdebug public clearsettlement [door|control|container] - очистить записи текущего поселения");
+        sendHelpLine(source, "/settlementdebug public clearall [door|control|container] - очистить вообще все записи");
+        sendHelpLine(source, "Команды add/remove/info работают по блоку, на который ты смотришь.");
+        return 1;
+    }
+
+    private static int sendDebugHelpResidents(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: residents");
+        sendHelpLine(source, "/settlementdebug addmember [settlement] <player> - добавить игрока в поселение");
+        sendHelpLine(source, "/settlementdebug removemember [settlement] <player> - удалить игрока из поселения");
+        sendHelpLine(source, "/settlementdebug residentsmenu [settlement] - открыть список жителей");
+        sendHelpLine(source, "/settlementdebug residentmenu <player> - открыть меню конкретного жителя");
+        sendHelpLine(source, "Если settlement не указан, команда пытается взять твое текущее поселение.");
+        return 1;
+    }
+
+    private static int sendDebugHelpMenu(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: menu");
+        sendHelpLine(source, "/settlementdebug menu [settlement] - открыть основное меню поселения");
+        sendHelpLine(source, "/settlementdebug residentsmenu [settlement] - открыть GUI жителей");
+        sendHelpLine(source, "/settlementdebug residentmenu <player> - открыть GUI управления жителем");
+        return 1;
+    }
+
+    private static int sendDebugHelpClaim(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: claim");
+        sendHelpLine(source, "/settlementdebug where - показать, кому принадлежит текущий чанк");
+        sendHelpLine(source, "/settlementdebug claim [settlement] - заклеймить текущий чанк");
+        sendHelpLine(source, "/settlementdebug unclaim - снять клейм с текущего чанка");
+        sendHelpLine(source, "/settlementdebug setallowance <amount> [settlement] - задать лимит купленных чанков");
+        return 1;
+    }
+
+    private static int sendDebugHelpShop(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: shop");
+        sendHelpLine(source, "/settlementdebug shop info - показать информацию о магазине, на который ты смотришь");
+        sendHelpLine(source, "/settlementdebug shop admin create - создать админ-магазин");
+        sendHelpLine(source, "/settlementdebug shop admin infinitestock on|off - бесконечный склад");
+        sendHelpLine(source, "/settlementdebug shop admin infinitebalance on|off - бесконечный баланс");
+        sendHelpLine(source, "/settlementdebug shop admin indestructible on|off - неразрушаемый магазин");
+        sendHelpLine(source, "/settlementdebug shop rename <name> - переименовать магазин");
+        sendHelpLine(source, "/settlementdebug shop enable|disable - включить или выключить магазин");
+        sendHelpLine(source, "/settlementdebug shop deposit <amount> / depositall / withdraw <amount> - работа с балансом");
+        sendHelpLine(source, "/settlementdebug shop buy <index> / sell <index> - тест сделок");
+        sendHelpLine(source, "/settlementdebug shop trade list - список сделок");
+        sendHelpLine(source, "/settlementdebug shop trade addsell|addbuy|adddual ... - добавить сделки");
+        sendHelpLine(source, "/settlementdebug shop trade dynamic ... - настроить динамическую цену");
+        sendHelpLine(source, "/settlementdebug shop trade fixed <index> - вернуть режим FIXED");
+        sendHelpLine(source, "/settlementdebug shop trade remove <index> - удалить сделку");
+        return 1;
+    }
+
+    private static int sendDebugHelpAdmin(CommandSourceStack source) {
+        sendHelpHeader(source, "Help: admin");
+        sendHelpLine(source, "/settlementdebug create <name> - создать поселение");
+        sendHelpLine(source, "/settlementdebug info [player] - показать информацию о поселении игрока");
+        sendHelpLine(source, "/settlementdebug disband [settlement] - распустить поселение");
+        sendHelpLine(source, "/settlementdebug money - посмотреть монеты у себя");
+        sendHelpLine(source, "/settlementdebug globalplotaccess grant|revoke|check <player> - глобальный доступ ко всем приватам");
+        sendHelpLine(source, "/settlementdebug globalplotaccess list - список игроков с глобальным доступом");
+        sendHelpLine(source, "Все команды settlementdebug доступны только OP.");
+        return 1;
+    }
+
+    private static void sendHelpHeader(CommandSourceStack source, String title) {
+        source.sendSuccess(() -> Component.literal("==== " + title + " ===="), false);
+    }
+
+    private static void sendHelpLine(CommandSourceStack source, String text) {
+        source.sendSuccess(() -> Component.literal(text), false);
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildPublicNode() {

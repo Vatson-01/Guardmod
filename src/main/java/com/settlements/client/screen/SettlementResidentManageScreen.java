@@ -14,6 +14,7 @@ public class SettlementResidentManageScreen extends AbstractContainerScreen<Sett
 
     private Button permissionPrevButton;
     private Button permissionNextButton;
+    private Button backButton;
 
     private Button personalTaxMinus100Button;
     private Button personalTaxMinus10Button;
@@ -56,8 +57,16 @@ public class SettlementResidentManageScreen extends AbstractContainerScreen<Sett
                 .bounds(left + 328, top + 6, 24, 18)
                 .build();
 
+        backButton = Button.builder(
+                        Component.literal("Назад"),
+                        button -> pressButton(SettlementResidentManageMenu.BUTTON_BACK_TO_RESIDENTS)
+                )
+                .bounds(left + 12, top + 6, 52, 18)
+                .build();
+
         addRenderableWidget(permissionPrevButton);
         addRenderableWidget(permissionNextButton);
+        addRenderableWidget(backButton);
 
         int buttonX = left + 320;
         int buttonY = top + 40;
@@ -231,7 +240,7 @@ public class SettlementResidentManageScreen extends AbstractContainerScreen<Sett
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(this.font, shorten("Поселение: " + menu.getSettlementName(), 40), 8, 6, 0xFFFFFF, false);
+        graphics.drawString(this.font, shorten("Поселение: " + menu.getSettlementName(), 32), 70, 6, 0xFFFFFF, false);
 
         if (!menu.hasTarget()) {
             graphics.drawString(this.font, "Житель не найден.", 8, 24, 0xFFB0B0, false);

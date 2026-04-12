@@ -50,6 +50,7 @@ public class SettlementMenu extends AbstractContainerMenu {
     public static final int BUTTON_RESTORE_RECONSTRUCTION = 13;
     public static final int BUTTON_STOP_RECONSTRUCTION = 14;
     public static final int BUTTON_OPEN_PLOT_MENU = 15;
+    public static final int BUTTON_OPEN_RESIDENTS_MENU = 16;
 
     public static final int BUTTON_TREASURY_AMOUNT_MINUS_1000 = 100;
     public static final int BUTTON_TREASURY_AMOUNT_MINUS_100 = 101;
@@ -110,7 +111,8 @@ public class SettlementMenu extends AbstractContainerMenu {
     private static final int DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_0 = 31;
     private static final int DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_1 = 32;
     private static final int DATA_CAN_OPEN_PLOT_MENU = 33;
-    private static final int DATA_COUNT = 34;
+    private static final int DATA_CAN_OPEN_RESIDENTS_MENU = 34;
+    private static final int DATA_COUNT = 35;
 
     private final UUID settlementId;
     private final String settlementName;
@@ -396,6 +398,16 @@ public class SettlementMenu extends AbstractContainerMenu {
                         && plot.isOwner(serverPlayer.getUUID());
             }
 
+
+private boolean canOpenResidentsMenu(Settlement settlement) {
+    if (settlement == null || !(playerInventory.player instanceof ServerPlayer)) {
+        return false;
+    }
+
+    ServerPlayer serverPlayer = (ServerPlayer) playerInventory.player;
+    return serverPlayer.hasPermissions(2) || settlement.isResident(serverPlayer.getUUID());
+}
+
             private long clampActionAmount(long value) {
                 if (value < 1L) {
                     return 1L;
@@ -584,6 +596,9 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
                 if (index == DATA_CAN_OPEN_PLOT_MENU) {
                     return canOpenPlotMenu(settlement, self) ? 1 : 0;
+                }
+                if (index == DATA_CAN_OPEN_RESIDENTS_MENU) {
+                    return canOpenResidentsMenu(settlement) ? 1 : 0;
                 }
 
                 return 0;
@@ -787,6 +802,10 @@ public class SettlementMenu extends AbstractContainerMenu {
         return menuData.get(DATA_CAN_OPEN_PLOT_MENU) != 0;
     }
 
+    public boolean canOpenResidentsMenu() {
+        return menuData.get(DATA_CAN_OPEN_RESIDENTS_MENU) != 0;
+    }
+
     private void setTreasuryActionAmount(long amount) {
         menuData.set(DATA_TREASURY_ACTION_AMOUNT_WORD_0, getWord(amount, 0));
         menuData.set(DATA_TREASURY_ACTION_AMOUNT_WORD_1, getWord(amount, 1));
@@ -854,6 +873,21 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return true;
             } catch (Exception ex) {
                 serverPlayer.displayClientMessage(Component.literal(messageOrDefault(ex, "Не удалось открыть меню участка.")), true);
+                return false;
+            }
+        }
+
+        if (buttonId == BUTTON_OPEN_RESIDENTS_MENU) {
+            if (!(player instanceof ServerPlayer)) {
+                return false;
+            }
+
+            ServerPlayer serverPlayer = (ServerPlayer) player;
+            try {
+                SettlementResidentsMenu.openFor(serverPlayer, settlementId);
+                return true;
+            } catch (Exception ex) {
+                serverPlayer.displayClientMessage(Component.literal(messageOrDefault(ex, "Не удалось открыть меню жителей.")), true);
                 return false;
             }
         }

@@ -1,14 +1,27 @@
 modLoader="javafml"
 loaderVersion="[47,)"
 license="All Rights Reserved"
+showAsResourcePack=false
 
 [[mods]]
 modId="settlements"
 version="1.0.0"
-displayName="Settlements"
-authors="Daniil Shuraev"
+displayName="Поселения"
+authors="Kombo3D"
+credits="Спасибо всем, кто помогает с тестированием и развитием мода."
 description='''
-Мод поселений и магазинов.
+Мод на систему поселений и магазинов для Minecraft Forge 1.20.1.
+
+В моде реализованы:
+- создание и развитие поселений;
+- управление жителями и их правами;
+- клеймы чанков и личные участки;
+- казна, налоги и долги;
+- публичные двери, контейнеры, кнопки и рычаги;
+- реконструкция после осад и базовая система войн.
+
+Мод рассчитан на серверы, где важны развитие территории,
+управление ресурсами и взаимодействие между игроками.
 '''
 
 [[dependencies.settlements]]

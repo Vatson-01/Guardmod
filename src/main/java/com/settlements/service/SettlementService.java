@@ -73,6 +73,140 @@ public final class SettlementService {
         data.markChanged();
     }
 
+    public static void inviteMember(MinecraftServer server, UUID settlementId, UUID actorUuid, UUID targetUuid) {
+        SettlementSavedData data = SettlementSavedData.get(server);
+        Settlement settlement = data.getSettlement(settlementId);
+
+        if (settlement == null) {
+            throw new IllegalArgumentException("Поселение не найдено.");
+        }
+        if (targetUuid == null) {
+            throw new IllegalArgumentException("Игрок не найден.");
+        }
+        if (targetUuid.equals(actorUuid)) {
+            throw new IllegalStateException("Нельзя пригласить самого себя.");
+        }
+        if (data.getSettlementByPlayer(targetUuid) != null) {
+            throw new IllegalStateException("Игрок уже состоит в поселении.");
+        }
+
+        SettlementMember actor = settlement.getMember(actorUuid);
+        if (actor == null) {
+            throw new IllegalStateException("Актёр не состоит в этом поселении.");
+        }
+
+        if (!canInvite(settlement, actorUuid, actor)) {
+            throw new IllegalStateException("У игрока нет права приглашать жителей.");
+        }
+
+        data.setPendingInvite(targetUuid, settlementId, actorUuid);
+    }
+
+    public static Settlement acceptPendingInvite(MinecraftServer server, UUID playerUuid, long gameTime) {
+        SettlementSavedData data = SettlementSavedData.get(server);
+        UUID settlementId = data.getPendingInviteSettlementId(playerUuid);
+        if (settlementId == null) {
+            throw new IllegalStateException("У тебя нет активного приглашения.");
+        }
+        if (data.getSettlementByPlayer(playerUuid) != null) {
+            data.clearPendingInvite(playerUuid);
+            throw new IllegalStateException("Ты уже состоишь в поселении.");
+        }
+
+        Settlement settlement = data.getSettlement(settlementId);
+        if (settlement == null) {
+            data.clearPendingInvite(playerUuid);
+            throw new IllegalStateException("Приглашение больше неактуально.");
+        }
+
+        settlement.addMember(playerUuid, gameTime);
+        data.clearPendingInvite(playerUuid);
+        data.markChanged();
+        return settlement;
+    }
+
+    public static Settlement declinePendingInvite(MinecraftServer server, UUID playerUuid) {
+        SettlementSavedData data = SettlementSavedData.get(server);
+        UUID settlementId = data.getPendingInviteSettlementId(playerUuid);
+        if (settlementId == null) {
+            throw new IllegalStateException("У тебя нет активного приглашения.");
+        }
+
+        Settlement settlement = data.getSettlement(settlementId);
+        data.clearPendingInvite(playerUuid);
+        return settlement;
+    }
+
+    public static LeaveSettlementResult leaveSettlement(MinecraftServer server, UUID playerUuid, long gameTime) {
+        SettlementSavedData data = SettlementSavedData.get(server);
+        Settlement settlement = data.getSettlementByPlayer(playerUuid);
+
+        if (settlement == null) {
+            throw new IllegalStateException("Ты не состоишь в поселении.");
+        }
+
+        boolean wasLeader = settlement.isLeader(playerUuid);
+        UUID newLeaderUuid = settlement.getLeaderUuid();
+
+        if (wasLeader) {
+            if (settlement.getMembers().size() <= 1) {
+                String settlementName = settlement.getName();
+                data.removeSettlement(settlement.getId());
+                return new LeaveSettlementResult(settlementName, true, true, null);
+            }
+
+            for (SettlementMember member : settlement.getMembers()) {
+                if (member != null && !playerUuid.equals(member.getPlayerUuid())) {
+                    newLeaderUuid = member.getPlayerUuid();
+                    break;
+                }
+            }
+
+            if (newLeaderUuid == null || newLeaderUuid.equals(playerUuid)) {
+                throw new IllegalStateException("Не удалось подобрать нового главу поселения.");
+            }
+
+            settlement.transferLeader(newLeaderUuid, gameTime);
+        }
+
+        PlotService.transferPlotsToLeaderOnMemberLeave(data, settlement.getId(), playerUuid, newLeaderUuid, gameTime);
+        ShopService.transferShopsToLeaderOnMemberLeave(data, settlement.getId(), playerUuid, newLeaderUuid, gameTime);
+        settlement.removeMember(playerUuid, gameTime);
+        data.markChanged();
+
+        return new LeaveSettlementResult(settlement.getName(), false, wasLeader, newLeaderUuid);
+    }
+
+    public static final class LeaveSettlementResult {
+        private final String settlementName;
+        private final boolean disbanded;
+        private final boolean leaderLeft;
+        private final UUID newLeaderUuid;
+
+        public LeaveSettlementResult(String settlementName, boolean disbanded, boolean leaderLeft, UUID newLeaderUuid) {
+            this.settlementName = settlementName;
+            this.disbanded = disbanded;
+            this.leaderLeft = leaderLeft;
+            this.newLeaderUuid = newLeaderUuid;
+        }
+
+        public String getSettlementName() {
+            return settlementName;
+        }
+
+        public boolean isDisbanded() {
+            return disbanded;
+        }
+
+        public boolean isLeaderLeft() {
+            return leaderLeft;
+        }
+
+        public UUID getNewLeaderUuid() {
+            return newLeaderUuid;
+        }
+    }
+
     /**
      * Новый безопасный вариант: добавление жителя с проверкой прав актёра.
      */
@@ -97,6 +231,7 @@ public final class SettlementService {
         }
 
         settlement.addMember(targetUuid, gameTime);
+        data.clearPendingInvite(targetUuid);
         data.markChanged();
     }
 
@@ -147,6 +282,7 @@ public final class SettlementService {
             throw new IllegalStateException("Игрок уже состоит в поселении.");
         }
         settlement.addMember(playerUuid, gameTime);
+        data.clearPendingInvite(playerUuid);
         data.markChanged();
     }
 
