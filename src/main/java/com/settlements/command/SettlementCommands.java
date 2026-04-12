@@ -90,7 +90,6 @@ public final class SettlementCommands {
                         .then(buildReconstructionNode())
                         .then(buildTaxNode())
                         .then(buildPublicNode())
-                        .then(buildTransferLeaderNode())
                         .then(buildDisbandNode())
         );
     }
@@ -927,46 +926,11 @@ public final class SettlementCommands {
                                 return sendTaxInfo(context);
                             }
                         })))
-                .then(buildTaxSettlementNode())
-                .then(buildTaxPlayerNode());
+                .then(buildTaxSettlementNode());
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildTaxSettlementNode() {
         return Commands.literal("settlement")
-                .then(Commands.literal("setland")
-                        .then(Commands.argument("amount", LongArgumentType.longArg(0L))
-                                .executes(context -> runHandled(context, new CommandAction() {
-                                    @Override
-                                    public int run() throws Exception {
-                                        ServerPlayer player = requirePlayer(context);
-                                        long amount = LongArgumentType.getLong(context, "amount");
-                                        TaxService.setSettlementLandTax(player, amount);
-                                        context.getSource().sendSuccess(() -> Component.literal("Налог за землю установлен: " + amount), true);
-                                        return 1;
-                                    }
-                                }))))
-                .then(Commands.literal("setresident")
-                        .then(Commands.argument("amount", LongArgumentType.longArg(0L))
-                                .executes(context -> runHandled(context, new CommandAction() {
-                                    @Override
-                                    public int run() throws Exception {
-                                        ServerPlayer player = requirePlayer(context);
-                                        long amount = LongArgumentType.getLong(context, "amount");
-                                        TaxService.setSettlementResidentTax(player, amount);
-                                        context.getSource().sendSuccess(() -> Component.literal("Налог за жителя установлен: " + amount), true);
-                                        return 1;
-                                    }
-                                }))))
-                .then(Commands.literal("accrue")
-                        .executes(context -> runHandled(context, new CommandAction() {
-                            @Override
-                            public int run() throws Exception {
-                                ServerPlayer player = requirePlayer(context);
-                                long accrued = TaxService.accrueSettlementTaxNow(player);
-                                context.getSource().sendSuccess(() -> Component.literal("Начислен долг поселения: " + accrued), true);
-                                return 1;
-                            }
-                        })))
                 .then(Commands.literal("pay")
                         .then(Commands.argument("amount", LongArgumentType.longArg(1L))
                                 .executes(context -> runHandled(context, new CommandAction() {

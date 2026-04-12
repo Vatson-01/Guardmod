@@ -60,6 +60,7 @@ import net.minecraftforge.fml.common.Mod;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -106,6 +107,7 @@ public final class SettlementDebugCommands {
                         .then(buildPublicNode())
                         .then(buildGlobalPlotAccessNode())
                         .then(buildCreateAccessNode())
+                        .then(buildTransferLeaderNode())
         );
     }
 
@@ -166,15 +168,15 @@ public final class SettlementDebugCommands {
 
     private static int sendDebugHelpTax(CommandSourceStack source) {
         sendHelpHeader(source, "Help: tax");
-        sendHelpLine(source, "/settlementdebug tax info - показать налоги и долги текущего поселения");
-        sendHelpLine(source, "/settlementdebug tax settlement setland <amount> - задать налог за землю");
-        sendHelpLine(source, "/settlementdebug tax settlement setresident <amount> - задать налог за жителя");
-        sendHelpLine(source, "/settlementdebug tax settlement accrue - начислить долг поселения");
-        sendHelpLine(source, "/settlementdebug tax settlement pay <amount> - оплатить долг поселения из казны");
-        sendHelpLine(source, "/settlementdebug tax player setpersonal <player> <amount> - задать личный налог игрока");
-        sendHelpLine(source, "/settlementdebug tax player setshop <player> <percent> - задать налог магазина игрока");
-        sendHelpLine(source, "/settlementdebug tax player accrue <player> - начислить личный долг игроку");
-        sendHelpLine(source, "/settlementdebug tax player accrueall - начислить личные долги всем жителям");
+        sendHelpLine(source, "/settlementdebug tax info [поселение] - показать налоги и долги поселения");
+        sendHelpLine(source, "/settlementdebug tax settlement setland <amount> [поселение] - задать налог за землю");
+        sendHelpLine(source, "/settlementdebug tax settlement setresident <amount> [поселение] - задать налог за жителя");
+        sendHelpLine(source, "/settlementdebug tax settlement accrue [поселение] - начислить долг поселения");
+        sendHelpLine(source, "/settlementdebug tax settlement pay <amount> [поселение] - оплатить долг поселения из казны");
+        sendHelpLine(source, "/settlementdebug tax player setpersonal <player> <amount> [поселение] - задать личный налог игрока");
+        sendHelpLine(source, "/settlementdebug tax player setshop <player> <percent> [поселение] - задать налог магазина игрока");
+        sendHelpLine(source, "/settlementdebug tax player accrue <player> [поселение] - начислить личный долг игроку");
+        sendHelpLine(source, "/settlementdebug tax player accrueall [поселение] - начислить личные долги всем жителям");
         sendHelpLine(source, "/settlementdebug tax player pay <amount> - оплатить свой личный долг");
         return 1;
     }
@@ -275,6 +277,7 @@ public final class SettlementDebugCommands {
         sendHelpLine(source, "/settlementdebug globalplotaccess list - список игроков с глобальным доступом");
         sendHelpLine(source, "/settlementdebug createaccess grant|revoke|check <player> - право на создание поселения");
         sendHelpLine(source, "/settlementdebug createaccess list - список игроков с правом на создание поселения");
+        sendHelpLine(source, "/settlementdebug transferleader <settlement> <player> - передать главу поселения");
         sendHelpLine(source, "Все команды settlementdebug доступны только OP.");
         return 1;
     }
@@ -616,7 +619,7 @@ public final class SettlementDebugCommands {
     private static LiteralArgumentBuilder<CommandSourceStack> buildSettlementMenuNode() {
         return Commands.literal("menu")
                 .executes(SettlementDebugCommands::openSettlementMenu)
-                .then(Commands.argument("settlement", StringArgumentType.string())
+                .then(Commands.argument("settlement", StringArgumentType.greedyString())
                         .suggests(SettlementDebugCommands::suggestSettlementNames)
                         .executes(SettlementDebugCommands::openSettlementMenuForSettlement));
     }
@@ -628,7 +631,7 @@ public final class SettlementDebugCommands {
     private static LiteralArgumentBuilder<CommandSourceStack> buildResidentsMenuNode() {
         return Commands.literal("residentsmenu")
                 .executes(SettlementDebugCommands::openResidentsMenu)
-                .then(Commands.argument("settlement", StringArgumentType.string())
+                .then(Commands.argument("settlement", StringArgumentType.greedyString())
                         .suggests(SettlementDebugCommands::suggestSettlementNames)
                         .executes(SettlementDebugCommands::openResidentsMenuForSettlement));
     }
@@ -980,125 +983,296 @@ public final class SettlementDebugCommands {
                                 })));
     }
 
+
     private static LiteralArgumentBuilder<CommandSourceStack> buildTaxNode() {
         return Commands.literal("tax")
                 .then(Commands.literal("info")
                         .executes(context -> {
-                            ServerPlayer player = context.getSource().getPlayerOrException();
-                            return sendTaxInfo(context.getSource(), player);
-                        }))
+                            ServerPlayer actor = context.getSource().getPlayerOrException();
+                            SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+                            Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
+                            if (settlement == null) {
+                                context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                                return 0;
+                            }
+                            return sendTaxInfo(context.getSource(), settlement);
+                        })
+                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .executes(context -> sendTaxInfo(context.getSource(), requireSettlementByName(context, "settlement")))))
                 .then(Commands.literal("settlement")
                         .then(Commands.literal("setland")
                                 .then(Commands.argument("amount", LongArgumentType.longArg(0L))
                                         .executes(context -> {
-                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            ServerPlayer actor = context.getSource().getPlayerOrException();
                                             long amount = LongArgumentType.getLong(context, "amount");
+                                            Settlement settlement = requireCurrentSettlementForDebugTax(actor);
 
-                                            TaxService.setSettlementLandTax(player, amount);
+                                            setSettlementLandTaxDebug(actor, settlement, amount);
 
                                             context.getSource().sendSuccess(
-                                                    () -> Component.literal("Налог за землю установлен: " + amount),
+                                                    () -> Component.literal("Налог за землю для поселения \"" + settlement.getName() + "\" установлен: " + amount),
                                                     true
                                             );
                                             return 1;
-                                        })))
+                                        })
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                                .executes(context -> {
+                                                    ServerPlayer actor = context.getSource().getPlayerOrException();
+                                                    long amount = LongArgumentType.getLong(context, "amount");
+                                                    Settlement settlement = requireSettlementByName(context, "settlement");
+
+                                                    setSettlementLandTaxDebug(actor, settlement, amount);
+
+                                                    context.getSource().sendSuccess(
+                                                            () -> Component.literal("Налог за землю для поселения \"" + settlement.getName() + "\" установлен: " + amount),
+                                                            true
+                                                    );
+                                                    return 1;
+                                                }))))
                         .then(Commands.literal("setresident")
                                 .then(Commands.argument("amount", LongArgumentType.longArg(0L))
                                         .executes(context -> {
-                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            ServerPlayer actor = context.getSource().getPlayerOrException();
                                             long amount = LongArgumentType.getLong(context, "amount");
+                                            Settlement settlement = requireCurrentSettlementForDebugTax(actor);
 
-                                            TaxService.setSettlementResidentTax(player, amount);
+                                            setSettlementResidentTaxDebug(actor, settlement, amount);
 
                                             context.getSource().sendSuccess(
-                                                    () -> Component.literal("Налог за жителя установлен: " + amount),
+                                                    () -> Component.literal("Налог за жителя для поселения \"" + settlement.getName() + "\" установлен: " + amount),
+                                                    true
+                                            );
+                                            return 1;
+                                        })
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                                .executes(context -> {
+                                                    ServerPlayer actor = context.getSource().getPlayerOrException();
+                                                    long amount = LongArgumentType.getLong(context, "amount");
+                                                    Settlement settlement = requireSettlementByName(context, "settlement");
+
+                                                    setSettlementResidentTaxDebug(actor, settlement, amount);
+
+                                                    context.getSource().sendSuccess(
+                                                            () -> Component.literal("Налог за жителя для поселения \"" + settlement.getName() + "\" установлен: " + amount),
+                                                            true
+                                                    );
+                                                    return 1;
+                                                }))))
+                        .then(Commands.literal("accrue")
+                                .executes(context -> {
+                                    ServerPlayer actor = context.getSource().getPlayerOrException();
+                                    Settlement settlement = requireCurrentSettlementForDebugTax(actor);
+                                    long accrued = accrueSettlementTaxDebug(actor, settlement);
+
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Начислен долг поселения \"" + settlement.getName() + "\": " + accrued),
+                                            true
+                                    );
+                                    return 1;
+                                })
+                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> {
+                                            ServerPlayer actor = context.getSource().getPlayerOrException();
+                                            Settlement settlement = requireSettlementByName(context, "settlement");
+                                            long accrued = accrueSettlementTaxDebug(actor, settlement);
+
+                                            context.getSource().sendSuccess(
+                                                    () -> Component.literal("Начислен долг поселения \"" + settlement.getName() + "\": " + accrued),
                                                     true
                                             );
                                             return 1;
                                         })))
-                        .then(Commands.literal("accrue")
-                                .executes(context -> {
-                                    ServerPlayer player = context.getSource().getPlayerOrException();
-                                    long accrued = TaxService.accrueSettlementTaxNow(player);
-
-                                    context.getSource().sendSuccess(
-                                            () -> Component.literal("Начислен долг поселения: " + accrued),
-                                            true
-                                    );
-                                    return 1;
-                                }))
                         .then(Commands.literal("pay")
                                 .then(Commands.argument("amount", LongArgumentType.longArg(1L))
                                         .executes(context -> {
-                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            ServerPlayer actor = context.getSource().getPlayerOrException();
                                             long amount = LongArgumentType.getLong(context, "amount");
-
-                                            long paid = TaxService.paySettlementDebtFromTreasury(player, amount);
+                                            Settlement settlement = requireCurrentSettlementForDebugTax(actor);
+                                            long paid = paySettlementDebtFromTreasuryDebug(actor, settlement, amount);
 
                                             context.getSource().sendSuccess(
-                                                    () -> Component.literal("Оплачен долг поселения: " + paid),
+                                                    () -> Component.literal("Оплачен долг поселения \"" + settlement.getName() + "\": " + paid),
                                                     true
                                             );
                                             return 1;
-                                        }))))
+                                        })
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                                .executes(context -> {
+                                                    ServerPlayer actor = context.getSource().getPlayerOrException();
+                                                    long amount = LongArgumentType.getLong(context, "amount");
+                                                    Settlement settlement = requireSettlementByName(context, "settlement");
+                                                    long paid = paySettlementDebtFromTreasuryDebug(actor, settlement, amount);
+
+                                                    context.getSource().sendSuccess(
+                                                            () -> Component.literal("Оплачен долг поселения \"" + settlement.getName() + "\": " + paid),
+                                                            true
+                                                    );
+                                                    return 1;
+                                                })))))
                 .then(Commands.literal("player")
                         .then(Commands.literal("setpersonal")
                                 .then(Commands.argument("player", EntityArgument.player())
                                         .then(Commands.argument("amount", LongArgumentType.longArg(0L))
                                                 .executes(context -> {
-                                                    ServerPlayer actor = context.getSource().getPlayerOrException();
                                                     ServerPlayer target = EntityArgument.getPlayer(context, "player");
                                                     long amount = LongArgumentType.getLong(context, "amount");
+                                                    Settlement settlement = requireTargetSettlementForDebugPlayerTax(context.getSource(), target, null);
 
-                                                    TaxService.setPlayerPersonalTax(actor, target, amount);
+                                                    SettlementMember member = settlement.getMember(target.getUUID());
+                                                    if (member == null) {
+                                                        context.getSource().sendFailure(Component.literal("Игрок не найден в поселении."));
+                                                        return 0;
+                                                    }
+
+                                                    member.setPersonalTaxAmount(amount);
+                                                    SettlementSavedData.get(context.getSource().getServer()).markChanged();
 
                                                     context.getSource().sendSuccess(
-                                                            () -> Component.literal("Личный налог игрока " + target.getGameProfile().getName() + " установлен: " + amount),
+                                                            () -> Component.literal("Личный налог игрока " + target.getGameProfile().getName() + " в поселении \"" + settlement.getName() + "\" установлен: " + amount),
                                                             true
                                                     );
                                                     return 1;
-                                                }))))
+                                                })
+                                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                                        .executes(context -> {
+                                                            ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                                                            long amount = LongArgumentType.getLong(context, "amount");
+                                                            Settlement settlement = requireTargetSettlementForDebugPlayerTax(context.getSource(), target, StringArgumentType.getString(context, "settlement"));
+
+                                                            SettlementMember member = settlement.getMember(target.getUUID());
+                                                            if (member == null) {
+                                                                context.getSource().sendFailure(Component.literal("Игрок не найден в поселении."));
+                                                                return 0;
+                                                            }
+
+                                                            member.setPersonalTaxAmount(amount);
+                                                            SettlementSavedData.get(context.getSource().getServer()).markChanged();
+
+                                                            context.getSource().sendSuccess(
+                                                                    () -> Component.literal("Личный налог игрока " + target.getGameProfile().getName() + " в поселении \"" + settlement.getName() + "\" установлен: " + amount),
+                                                                    true
+                                                            );
+                                                            return 1;
+                                                        })))))
                         .then(Commands.literal("setshop")
                                 .then(Commands.argument("player", EntityArgument.player())
                                         .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
                                                 .executes(context -> {
-                                                    ServerPlayer actor = context.getSource().getPlayerOrException();
                                                     ServerPlayer target = EntityArgument.getPlayer(context, "player");
                                                     int percent = IntegerArgumentType.getInteger(context, "percent");
+                                                    Settlement settlement = requireTargetSettlementForDebugPlayerTax(context.getSource(), target, null);
 
-                                                    TaxService.setPlayerShopTaxPercent(actor, target, percent);
+                                                    SettlementMember member = settlement.getMember(target.getUUID());
+                                                    if (member == null) {
+                                                        context.getSource().sendFailure(Component.literal("Игрок не найден в поселении."));
+                                                        return 0;
+                                                    }
+
+                                                    member.setShopTaxPercent(percent);
+                                                    SettlementSavedData.get(context.getSource().getServer()).markChanged();
 
                                                     context.getSource().sendSuccess(
-                                                            () -> Component.literal("Налог магазинов игрока " + target.getGameProfile().getName() + " установлен: " + percent + "%"),
+                                                            () -> Component.literal("Налог магазинов игрока " + target.getGameProfile().getName() + " в поселении \"" + settlement.getName() + "\" установлен: " + percent + "%"),
+                                                            true
+                                                    );
+                                                    return 1;
+                                                })
+                                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                                        .executes(context -> {
+                                                            ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                                                            int percent = IntegerArgumentType.getInteger(context, "percent");
+                                                            Settlement settlement = requireTargetSettlementForDebugPlayerTax(context.getSource(), target, StringArgumentType.getString(context, "settlement"));
+
+                                                            SettlementMember member = settlement.getMember(target.getUUID());
+                                                            if (member == null) {
+                                                                context.getSource().sendFailure(Component.literal("Игрок не найден в поселении."));
+                                                                return 0;
+                                                            }
+
+                                                            member.setShopTaxPercent(percent);
+                                                            SettlementSavedData.get(context.getSource().getServer()).markChanged();
+
+                                                            context.getSource().sendSuccess(
+                                                                    () -> Component.literal("Налог магазинов игрока " + target.getGameProfile().getName() + " в поселении \"" + settlement.getName() + "\" установлен: " + percent + "%"),
+                                                                    true
+                                                            );
+                                                            return 1;
+                                                        })))))
+                        .then(Commands.literal("accrue")
+                                .then(Commands.argument("player", EntityArgument.player())
+                                        .executes(context -> {
+                                            ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                                            Settlement settlement = requireTargetSettlementForDebugPlayerTax(context.getSource(), target, null);
+
+                                            SettlementMember member = settlement.getMember(target.getUUID());
+                                            if (member == null) {
+                                                context.getSource().sendFailure(Component.literal("Игрок не найден в поселении."));
+                                                return 0;
+                                            }
+
+                                            long accrued = member.getPersonalTaxAmount();
+                                            member.addPersonalTaxDebt(accrued);
+                                            SettlementSavedData.get(context.getSource().getServer()).markChanged();
+
+                                            context.getSource().sendSuccess(
+                                                    () -> Component.literal("Игроку " + target.getGameProfile().getName() + " в поселении \"" + settlement.getName() + "\" начислен личный долг: " + accrued),
+                                                    true
+                                            );
+                                            return 1;
+                                        })
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                                .executes(context -> {
+                                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                                                    Settlement settlement = requireTargetSettlementForDebugPlayerTax(context.getSource(), target, StringArgumentType.getString(context, "settlement"));
+
+                                                    SettlementMember member = settlement.getMember(target.getUUID());
+                                                    if (member == null) {
+                                                        context.getSource().sendFailure(Component.literal("Игрок не найден в поселении."));
+                                                        return 0;
+                                                    }
+
+                                                    long accrued = member.getPersonalTaxAmount();
+                                                    member.addPersonalTaxDebt(accrued);
+                                                    SettlementSavedData.get(context.getSource().getServer()).markChanged();
+
+                                                    context.getSource().sendSuccess(
+                                                            () -> Component.literal("Игроку " + target.getGameProfile().getName() + " в поселении \"" + settlement.getName() + "\" начислен личный долг: " + accrued),
                                                             true
                                                     );
                                                     return 1;
                                                 }))))
-                        .then(Commands.literal("accrue")
-                                .then(Commands.argument("player", EntityArgument.player())
-                                        .executes(context -> {
-                                            ServerPlayer actor = context.getSource().getPlayerOrException();
-                                            ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                        .then(Commands.literal("accrueall")
+                                .executes(context -> {
+                                    ServerPlayer actor = context.getSource().getPlayerOrException();
+                                    Settlement settlement = requireCurrentSettlementForDebugTax(actor);
+                                    long total = accruePersonalTaxForAllDebug(context.getSource(), settlement);
 
-                                            long accrued = TaxService.accruePersonalTaxForPlayer(actor, target);
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Суммарно начислено личных долгов в поселении \"" + settlement.getName() + "\": " + total),
+                                            true
+                                    );
+                                    return 1;
+                                })
+                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> {
+                                            Settlement settlement = requireSettlementByName(context, "settlement");
+                                            long total = accruePersonalTaxForAllDebug(context.getSource(), settlement);
 
                                             context.getSource().sendSuccess(
-                                                    () -> Component.literal("Игроку начислен личный долг: " + accrued),
+                                                    () -> Component.literal("Суммарно начислено личных долгов в поселении \"" + settlement.getName() + "\": " + total),
                                                     true
                                             );
                                             return 1;
                                         })))
-                        .then(Commands.literal("accrueall")
-                                .executes(context -> {
-                                    ServerPlayer actor = context.getSource().getPlayerOrException();
-                                    long total = TaxService.accruePersonalTaxForAll(actor);
-
-                                    context.getSource().sendSuccess(
-                                            () -> Component.literal("Суммарно начислено личных долгов: " + total),
-                                            true
-                                    );
-                                    return 1;
-                                }))
                         .then(Commands.literal("pay")
                                 .then(Commands.argument("amount", LongArgumentType.longArg(1L))
                                         .executes(context -> {
@@ -1113,6 +1287,87 @@ public final class SettlementDebugCommands {
                                             );
                                             return 1;
                                         }))));
+    }
+
+    private static Settlement requireCurrentSettlementForDebugTax(ServerPlayer actor) {
+        SettlementSavedData data = SettlementSavedData.get(actor.server);
+        Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
+        if (settlement == null) {
+            throw new IllegalStateException("Ты не состоишь в поселении. Укажи название поселения явно.");
+        }
+        return settlement;
+    }
+
+    private static void setSettlementLandTaxDebug(ServerPlayer actor, Settlement settlement, long amount) {
+        settlement.getTaxConfig().setLandTaxPerClaimedChunk(amount);
+        SettlementSavedData.get(actor.server).markChanged();
+    }
+
+    private static void setSettlementResidentTaxDebug(ServerPlayer actor, Settlement settlement, long amount) {
+        settlement.getTaxConfig().setResidentTaxPerResident(amount);
+        SettlementSavedData.get(actor.server).markChanged();
+    }
+
+    private static long accrueSettlementTaxDebug(ServerPlayer actor, Settlement settlement) {
+        long amount = TaxService.calculateSettlementTax(settlement);
+        settlement.addSettlementDebt(amount, actor.level().getGameTime());
+        SettlementSavedData.get(actor.server).markChanged();
+        return amount;
+    }
+
+    private static long paySettlementDebtFromTreasuryDebug(ServerPlayer actor, Settlement settlement, long requestedAmount) {
+        if (requestedAmount <= 0L) {
+            throw new IllegalArgumentException("Сумма должна быть больше нуля.");
+        }
+
+        long actualAmount = Math.min(settlement.getSettlementDebt(), requestedAmount);
+        if (actualAmount <= 0L) {
+            throw new IllegalStateException("У поселения нет долга.");
+        }
+
+        boolean treasuryWithdrawn = settlement.withdrawFromTreasury(actualAmount, actor.level().getGameTime());
+        if (!treasuryWithdrawn) {
+            throw new IllegalStateException("В казне недостаточно средств.");
+        }
+
+        long paid = settlement.reduceSettlementDebt(actualAmount, actor.level().getGameTime());
+        SettlementSavedData.get(actor.server).markChanged();
+        return paid;
+    }
+
+    private static Settlement requireTargetSettlementForDebugPlayerTax(CommandSourceStack source, ServerPlayer target, String explicitSettlementName) {
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+
+        Settlement settlement;
+        if (explicitSettlementName != null && !normalizeSettlementNameInput(explicitSettlementName).isEmpty()) {
+            settlement = requireSettlementByRawName(source, explicitSettlementName);
+            if (!settlement.isResident(target.getUUID())) {
+                throw new IllegalStateException("Игрок " + target.getGameProfile().getName() + " не состоит в поселении \"" + settlement.getName() + "\".");
+            }
+            return settlement;
+        }
+
+        settlement = data.getSettlementByPlayer(target.getUUID());
+        if (settlement == null) {
+            throw new IllegalStateException("Игрок " + target.getGameProfile().getName() + " не состоит в поселении.");
+        }
+        return settlement;
+    }
+
+    private static long accruePersonalTaxForAllDebug(CommandSourceStack source, Settlement settlement) {
+        long total = 0L;
+        for (SettlementMember member : settlement.getMembers()) {
+            if (member == null || member.isLeader()) {
+                continue;
+            }
+            long amount = member.getPersonalTaxAmount();
+            if (amount > 0L) {
+                member.addPersonalTaxDebt(amount);
+                total += amount;
+            }
+        }
+        SettlementSavedData.get(source.getServer()).markChanged();
+        return total;
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildCreateNode() {
@@ -1196,7 +1451,7 @@ public final class SettlementDebugCommands {
                     );
                     return 1;
                 })
-                .then(Commands.argument("settlement", StringArgumentType.string())
+                .then(Commands.argument("settlement", StringArgumentType.greedyString())
                         .suggests(SettlementDebugCommands::suggestSettlementNames)
                         .executes(context -> {
                             ServerPlayer player = context.getSource().getPlayerOrException();
@@ -1251,7 +1506,7 @@ public final class SettlementDebugCommands {
                             );
                             return 1;
                         })
-                        .then(Commands.argument("settlement", StringArgumentType.string())
+                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
                                 .suggests(SettlementDebugCommands::suggestSettlementNames)
                                 .executes(context -> {
                                     ServerPlayer player = context.getSource().getPlayerOrException();
@@ -1751,7 +2006,7 @@ public final class SettlementDebugCommands {
                     );
                     return 1;
                 })
-                .then(Commands.argument("settlement", StringArgumentType.string())
+                .then(Commands.argument("settlement", StringArgumentType.greedyString())
                         .suggests(SettlementDebugCommands::suggestSettlementNames)
                         .executes(context -> {
                             Settlement settlement = requireSettlementByName(context, "settlement");
@@ -1888,13 +2143,43 @@ public final class SettlementDebugCommands {
     }
 
     private static Settlement requireSettlementByName(CommandContext<CommandSourceStack> context, String argumentName) {
-        String settlementName = StringArgumentType.getString(context, argumentName);
-        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
-        Settlement settlement = data.getSettlementByName(settlementName);
-        if (settlement == null) {
-            throw new IllegalStateException("Поселение \"" + settlementName + "\" не найдено.");
+        return requireSettlementByRawName(context.getSource(), StringArgumentType.getString(context, argumentName));
+    }
+
+    private static Settlement requireSettlementByRawName(CommandSourceStack source, String rawName) {
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        String normalized = normalizeSettlementNameInput(rawName);
+        Settlement settlement = data.getSettlementByName(normalized);
+        if (settlement != null) {
+            return settlement;
         }
-        return settlement;
+
+        String lowered = normalized.toLowerCase(Locale.ROOT);
+        for (Settlement current : data.getAllSettlements()) {
+            String currentName = current.getName();
+            if (currentName != null && normalizeSettlementNameInput(currentName).toLowerCase(Locale.ROOT).equals(lowered)) {
+                return current;
+            }
+        }
+
+        throw new IllegalStateException("Поселение \"" + normalized + "\" не найдено.");
+    }
+
+    private static String normalizeSettlementNameInput(String rawName) {
+        if (rawName == null) {
+            return "";
+        }
+
+        String value = rawName.trim();
+        if (value.length() >= 2) {
+            char first = value.charAt(0);
+            char last = value.charAt(value.length() - 1);
+            if ((first == '\"' && last == '\"') || (first == '\'' && last == '\'')) {
+                value = value.substring(1, value.length() - 1).trim();
+            }
+        }
+
+        return value.replaceAll("\\s+", " ");
     }
 
     private static CompletableFuture<Suggestions> suggestSettlementNames(
@@ -1906,6 +2191,38 @@ public final class SettlementDebugCommands {
                 data.getAllSettlements().stream().map(Settlement::getName),
                 builder
         );
+    }
+
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildTransferLeaderNode() {
+        return Commands.literal("transferleader")
+                .then(Commands.argument("settlement", StringArgumentType.string())
+                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    ServerPlayer actor = source.getPlayerOrException();
+                                    Settlement settlement = requireSettlementByName(context, "settlement");
+                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+                                    if (!settlement.isResident(target.getUUID())) {
+                                        source.sendFailure(Component.literal("Новый глава должен быть жителем поселения."));
+                                        return 0;
+                                    }
+
+                                    SettlementService.transferLeader(
+                                            source.getServer(),
+                                            settlement.getId(),
+                                            target.getUUID(),
+                                            actor.level().getGameTime()
+                                    );
+
+                                    source.sendSuccess(
+                                            () -> Component.literal("Глава поселения \"" + settlement.getName() + "\" передан игроку: " + target.getGameProfile().getName()),
+                                            true
+                                    );
+                                    return 1;
+                                })));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildWarNode() {
@@ -1935,7 +2252,7 @@ public final class SettlementDebugCommands {
                                                 )))
                                 )))
                 .then(Commands.literal("info")
-                        .then(Commands.argument("settlement", StringArgumentType.string())
+                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
                                 .suggests(SettlementDebugCommands::suggestSettlementNames)
                                 .executes(SettlementDebugCommands::warInfo)));
     }
@@ -1967,7 +2284,7 @@ public final class SettlementDebugCommands {
                                                 )))
                                 )))
                 .then(Commands.literal("info")
-                        .then(Commands.argument("settlement", StringArgumentType.string())
+                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
                                 .suggests(SettlementDebugCommands::suggestSettlementNames)
                                 .executes(SettlementDebugCommands::siegeInfo)));
     }
@@ -2525,28 +2842,38 @@ public final class SettlementDebugCommands {
         return 1;
     }
 
-    private static int sendTaxInfo(CommandSourceStack source, ServerPlayer player) {
-        SettlementSavedData data = SettlementSavedData.get(source.getServer());
-        Settlement settlement = data.getSettlementByPlayer(player.getUUID());
-
+    private static int sendTaxInfo(CommandSourceStack source, Settlement settlement) {
         if (settlement == null) {
-            source.sendFailure(Component.literal("Игрок не состоит в поселении."));
-            return 0;
-        }
-
-        SettlementMember self = settlement.getMember(player.getUUID());
-        if (self == null) {
-            source.sendFailure(Component.literal("Игрок не найден в поселении."));
+            source.sendFailure(Component.literal("Поселение не найдено."));
             return 0;
         }
 
         source.sendSuccess(() -> Component.literal("==== Налоги ===="), false);
+        source.sendSuccess(() -> Component.literal("Поселение: " + settlement.getName()), false);
         source.sendSuccess(() -> Component.literal("Долг поселения: " + settlement.getSettlementDebt()), false);
         source.sendSuccess(() -> Component.literal("Налог за землю: " + settlement.getTaxConfig().getLandTaxPerClaimedChunk()), false);
         source.sendSuccess(() -> Component.literal("Налог за жителя: " + settlement.getTaxConfig().getResidentTaxPerResident()), false);
-        source.sendSuccess(() -> Component.literal("Твой личный налог: " + self.getPersonalTaxAmount()), false);
-        source.sendSuccess(() -> Component.literal("Твой личный долг: " + self.getPersonalTaxDebt()), false);
-        source.sendSuccess(() -> Component.literal("Твой налог магазинов: " + self.getShopTaxPercent() + "%"), false);
+
+        int residentsShown = 0;
+        for (SettlementMember member : settlement.getMembers()) {
+            final SettlementMember currentMember = member;
+            source.sendSuccess(
+                    () -> Component.literal(
+                            "- " + currentMember.getPlayerUuid()
+                                    + (currentMember.isLeader() ? " [ГЛАВА]" : "")
+                                    + " | personalTax=" + currentMember.getPersonalTaxAmount()
+                                    + " | personalDebt=" + currentMember.getPersonalTaxDebt()
+                                    + " | shopTax=" + currentMember.getShopTaxPercent() + "%"
+                    ),
+                    false
+            );
+            residentsShown++;
+            if (residentsShown >= 12 && settlement.getMembers().size() > residentsShown) {
+                final int remaining = settlement.getMembers().size() - residentsShown;
+                source.sendSuccess(() -> Component.literal("... и еще жителей: " + remaining), false);
+                break;
+            }
+        }
 
         return 1;
     }

@@ -148,37 +148,17 @@ public final class SettlementService {
         if (settlement == null) {
             throw new IllegalStateException("Ты не состоишь в поселении.");
         }
-
-        boolean wasLeader = settlement.isLeader(playerUuid);
-        UUID newLeaderUuid = settlement.getLeaderUuid();
-
-        if (wasLeader) {
-            if (settlement.getMembers().size() <= 1) {
-                String settlementName = settlement.getName();
-                data.removeSettlement(settlement.getId());
-                return new LeaveSettlementResult(settlementName, true, true, null);
-            }
-
-            for (SettlementMember member : settlement.getMembers()) {
-                if (member != null && !playerUuid.equals(member.getPlayerUuid())) {
-                    newLeaderUuid = member.getPlayerUuid();
-                    break;
-                }
-            }
-
-            if (newLeaderUuid == null || newLeaderUuid.equals(playerUuid)) {
-                throw new IllegalStateException("Не удалось подобрать нового главу поселения.");
-            }
-
-            settlement.transferLeader(newLeaderUuid, gameTime);
+        if (settlement.isLeader(playerUuid)) {
+            throw new IllegalStateException("Глава поселения не может покинуть его. Сначала распусти поселение или передай главу через администратора.");
         }
 
-        PlotService.transferPlotsToLeaderOnMemberLeave(data, settlement.getId(), playerUuid, newLeaderUuid, gameTime);
-        ShopService.transferShopsToLeaderOnMemberLeave(data, settlement.getId(), playerUuid, newLeaderUuid, gameTime);
+        UUID leaderUuid = settlement.getLeaderUuid();
+        PlotService.transferPlotsToLeaderOnMemberLeave(data, settlement.getId(), playerUuid, leaderUuid, gameTime);
+        ShopService.transferShopsToLeaderOnMemberLeave(data, settlement.getId(), playerUuid, leaderUuid, gameTime);
         settlement.removeMember(playerUuid, gameTime);
         data.markChanged();
 
-        return new LeaveSettlementResult(settlement.getName(), false, wasLeader, newLeaderUuid);
+        return new LeaveSettlementResult(settlement.getName(), false, false, leaderUuid);
     }
 
     public static final class LeaveSettlementResult {
