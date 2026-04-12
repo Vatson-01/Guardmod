@@ -82,8 +82,33 @@ public final class SettlementCommands {
         );
     }
 
+    private static boolean isPlayerSource(CommandSourceStack source) {
+        return source.getEntity() instanceof ServerPlayer;
+    }
+
+    private static boolean hasSettlementCreateAccessSource(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer)) {
+            return false;
+        }
+
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        return SettlementSavedData.get(player.server).hasSettlementCreateAccess(player.getUUID());
+    }
+
+    private static boolean canCreateSettlementSource(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer)) {
+            return false;
+        }
+
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+        return data.getSettlementByPlayer(player.getUUID()) == null
+                && data.hasSettlementCreateAccess(player.getUUID());
+    }
+
     private static LiteralArgumentBuilder<CommandSourceStack> buildCreateNode() {
         return Commands.literal("create")
+                .requires(SettlementCommands::canCreateSettlementSource)
                 .then(Commands.argument("name", StringArgumentType.greedyString())
                         .executes(context -> runHandled(context, new CommandAction() {
                             @Override
@@ -98,6 +123,7 @@ public final class SettlementCommands {
                                         player.level().getGameTime()
                                 );
 
+                                refreshCommandTrees(player.server, player);
                                 context.getSource().sendSuccess(
                                         () -> Component.literal("Создано поселение: " + settlement.getName()),
                                         true

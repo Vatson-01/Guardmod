@@ -25,12 +25,16 @@ public final class SettlementService {
         if (data.getSettlementByPlayer(leaderUuid) != null) {
             throw new IllegalStateException("Игрок уже состоит в поселении.");
         }
+        if (!data.hasSettlementCreateAccess(leaderUuid)) {
+            throw new IllegalStateException("У тебя нет права на создание поселения.");
+        }
         if (data.getSettlementByName(name) != null) {
             throw new IllegalStateException("Поселение с таким названием уже существует.");
         }
 
         Settlement settlement = Settlement.createNew(name, leaderUuid, gameTime);
         data.addSettlement(settlement);
+        data.consumeSettlementCreateAccess(leaderUuid);
         return settlement;
     }
 

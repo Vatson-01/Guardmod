@@ -69,6 +69,7 @@ public class SettlementSavedData extends SavedData {
     private final Map<UUID, UUID> activeReconstructionIdBySettlementId = new LinkedHashMap<UUID, UUID>();
 
     private final Set<UUID> globalPlotAccessPlayerUuids = new LinkedHashSet<UUID>();
+    private final Set<UUID> settlementCreateAccessPlayerUuids = new LinkedHashSet<UUID>();
     private final Set<String> publicDoorKeys = new LinkedHashSet<String>();
     private final Set<String> publicDoorControlKeys = new LinkedHashSet<String>();
     private final Set<String> publicContainerKeys = new LinkedHashSet<String>();
@@ -198,6 +199,17 @@ public class SettlementSavedData extends SavedData {
             }
         }
 
+        if (tag.contains("SettlementCreateAccessPlayers", Tag.TAG_LIST)) {
+            ListTag createAccessList = tag.getList("SettlementCreateAccessPlayers", Tag.TAG_STRING);
+            for (int i = 0; i < createAccessList.size(); i++) {
+                String rawUuid = createAccessList.getString(i);
+                try {
+                    data.settlementCreateAccessPlayerUuids.add(UUID.fromString(rawUuid));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+
         if (tag.contains("PublicDoorKeys", Tag.TAG_LIST)) {
             ListTag publicDoorList = tag.getList("PublicDoorKeys", Tag.TAG_STRING);
             for (int i = 0; i < publicDoorList.size(); i++) {
@@ -308,6 +320,12 @@ public class SettlementSavedData extends SavedData {
             globalPlotAccessTag.add(StringTag.valueOf(playerUuid.toString()));
         }
         tag.put("GlobalPlotAccessPlayers", globalPlotAccessTag);
+
+        ListTag settlementCreateAccessTag = new ListTag();
+        for (UUID playerUuid : settlementCreateAccessPlayerUuids) {
+            settlementCreateAccessTag.add(StringTag.valueOf(playerUuid.toString()));
+        }
+        tag.put("SettlementCreateAccessPlayers", settlementCreateAccessTag);
 
         ListTag publicDoorTag = new ListTag();
         for (String key : publicDoorKeys) {
@@ -473,6 +491,40 @@ public class SettlementSavedData extends SavedData {
     public Collection<UUID> getGlobalPlotAccessPlayers() {
         return Collections.unmodifiableSet(globalPlotAccessPlayerUuids);
     }
+
+    public boolean hasSettlementCreateAccess(UUID playerUuid) {
+        return playerUuid != null && settlementCreateAccessPlayerUuids.contains(playerUuid);
+    }
+
+    public void setSettlementCreateAccess(UUID playerUuid, boolean enabled) {
+        if (playerUuid == null) {
+            return;
+        }
+
+        if (enabled) {
+            settlementCreateAccessPlayerUuids.add(playerUuid);
+        } else {
+            settlementCreateAccessPlayerUuids.remove(playerUuid);
+        }
+        setDirty();
+    }
+
+    public boolean consumeSettlementCreateAccess(UUID playerUuid) {
+        if (playerUuid == null) {
+            return false;
+        }
+
+        boolean removed = settlementCreateAccessPlayerUuids.remove(playerUuid);
+        if (removed) {
+            setDirty();
+        }
+        return removed;
+    }
+
+    public Collection<UUID> getSettlementCreateAccessPlayers() {
+        return Collections.unmodifiableSet(settlementCreateAccessPlayerUuids);
+    }
+
 
     public boolean isPublicDoor(Level level, BlockPos pos) {
         return isPublicKey(publicDoorKeys, level, pos, resolveDoorObjectPositions(level, pos));
