@@ -10,6 +10,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import com.guardmod.model.ClientEnvironmentReport;
 import com.guardmod.model.ClientResourcePackEntry;
 import com.guardmod.validate.ClientEnvironmentReportCache;
+import com.guardmod.validate.ValidationRequestModeRegistry;
 import com.guardmod.model.ClientShaderPackEntry;
 import com.guardmod.validate.ShaderPackRulesValidator;
 import com.guardmod.validate.ResourcePackRulesValidator;
@@ -69,6 +70,8 @@ public final class GuardModCommands {
     private static void requestValidation(ServerPlayer player) {
         long timeoutMillis = GuardCommonConfig.VALIDATION_TIMEOUT_SECONDS.get().longValue() * 1000L;
         long deadlineEpochMillis = System.currentTimeMillis() + timeoutMillis;
+
+        ValidationRequestModeRegistry.setMode(player, ValidationRequestModeRegistry.RequestMode.FULL);
 
         ValidationStateRegistry.ValidationTicket ticket =
                 ValidationStateRegistry.createPending(player, deadlineEpochMillis);

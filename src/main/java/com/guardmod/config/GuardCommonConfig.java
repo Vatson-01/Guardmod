@@ -11,6 +11,11 @@ public final class GuardCommonConfig {
     public static final ForgeConfigSpec.IntValue VALIDATION_TIMEOUT_SECONDS;
     public static final ForgeConfigSpec.BooleanValue RESCAN_ON_SERVER_START;
     public static final ForgeConfigSpec.BooleanValue VERBOSE_KICK_REASON;
+    public static final ForgeConfigSpec.BooleanValue PERIODIC_DYNAMIC_CHECKS_ENABLED;
+    public static final ForgeConfigSpec.IntValue PERIODIC_DYNAMIC_CHECK_BASE_SECONDS;
+    public static final ForgeConfigSpec.IntValue PERIODIC_DYNAMIC_CHECK_JITTER_SECONDS;
+    public static final ForgeConfigSpec.BooleanValue LOG_PERIODIC_VALIDATION_REQUESTS;
+    public static final ForgeConfigSpec.BooleanValue LOG_PERIODIC_VALIDATION_PASSES;
 
     public static final ForgeConfigSpec.ConfigValue<String> MODS_MODE;
     public static final ForgeConfigSpec.ConfigValue<String> SERVER_REQUIRED_EXCLUDES;
@@ -45,6 +50,26 @@ public final class GuardCommonConfig {
         VERBOSE_KICK_REASON = builder
                 .comment("Show more detailed kick reasons to the player.")
                 .define("verboseKickReason", true);
+
+        PERIODIC_DYNAMIC_CHECKS_ENABLED = builder
+                .comment("Enable periodic revalidation of dynamic client assets like resource packs and shader packs.")
+                .define("periodicDynamicChecksEnabled", true);
+
+        PERIODIC_DYNAMIC_CHECK_BASE_SECONDS = builder
+                .comment("Base interval in seconds for periodic dynamic-asset checks.")
+                .defineInRange("periodicDynamicCheckBaseSeconds", 120, 15, 3600);
+
+        PERIODIC_DYNAMIC_CHECK_JITTER_SECONDS = builder
+                .comment("Additional random jitter in seconds for periodic dynamic-asset checks.")
+                .defineInRange("periodicDynamicCheckJitterSeconds", 90, 0, 3600);
+
+        LOG_PERIODIC_VALIDATION_REQUESTS = builder
+                .comment("Log each periodic validation request.")
+                .define("logPeriodicValidationRequests", false);
+
+        LOG_PERIODIC_VALIDATION_PASSES = builder
+                .comment("Log successful periodic dynamic-asset validation passes.")
+                .define("logPeriodicValidationPasses", false);
         builder.pop();
 
         builder.push("mods");

@@ -9,6 +9,7 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import com.guardmod.validate.ClientEnvironmentReportCache;
+import com.guardmod.validate.ValidationRequestModeRegistry;
 import com.guardmod.scanner.ShaderPackScanService;
 import com.guardmod.command.GuardModCommands;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -23,8 +24,6 @@ public class GuardServerEvents {
     private static final java.util.Map<java.util.UUID, Long> NEXT_PERIODIC_REVALIDATION_AT =
             new java.util.HashMap<java.util.UUID, Long>();
 
-    private static final long PERIODIC_REVALIDATION_BASE_INTERVAL_MILLIS = 30000L;
-    private static final long PERIODIC_REVALIDATION_JITTER_MILLIS = 15000L;
     private static final java.util.Random PERIODIC_REVALIDATION_RANDOM = new java.util.Random();
 
     @SubscribeEvent
@@ -49,11 +48,18 @@ public class GuardServerEvents {
         long timeoutMillis = GuardCommonConfig.VALIDATION_TIMEOUT_SECONDS.get().longValue() * 1000L;
         long deadlineEpochMillis = System.currentTimeMillis() + timeoutMillis;
 
+        ValidationRequestModeRegistry.setMode(player, ValidationRequestModeRegistry.RequestMode.FULL);
+
         ValidationStateRegistry.ValidationTicket ticket = ValidationStateRegistry.createPending(player, deadlineEpochMillis);
         LOGGER.info("GuardMod sent validation request {} to {} with timeout {} ms.",
                 ticket.getRequestId(), player.getGameProfile().getName(), timeoutMillis);
         GuardNetwork.sendEnvironmentRequest(player, ticket.getRequestId(), ticket.getDeadlineEpochMillis());
-        NEXT_PERIODIC_REVALIDATION_AT.put(player.getUUID(), System.currentTimeMillis() + nextPeriodicDelayMillis());
+
+        if (GuardCommonConfig.PERIODIC_DYNAMIC_CHECKS_ENABLED.get()) {
+            NEXT_PERIODIC_REVALIDATION_AT.put(player.getUUID(), System.currentTimeMillis() + nextPeriodicDelayMillis());
+        } else {
+            NEXT_PERIODIC_REVALIDATION_AT.remove(player.getUUID());
+        }
     }
 
     @SubscribeEvent
@@ -80,32 +86,43 @@ public class GuardServerEvents {
             return;
         }
 
+        if (!GuardCommonConfig.PERIODIC_DYNAMIC_CHECKS_ENABLED.get()) {
+            return;
+        }
+
         Long nextPeriodicAt = NEXT_PERIODIC_REVALIDATION_AT.get(player.getUUID());
         if (nextPeriodicAt != null && now >= nextPeriodicAt) {
             long timeoutMillis = GuardCommonConfig.VALIDATION_TIMEOUT_SECONDS.get().longValue() * 1000L;
             long deadlineEpochMillis = now + timeoutMillis;
 
+            ValidationRequestModeRegistry.setMode(player, ValidationRequestModeRegistry.RequestMode.DYNAMIC_ASSETS);
             ValidationStateRegistry.ValidationTicket ticket = ValidationStateRegistry.createPending(player, deadlineEpochMillis);
             NEXT_PERIODIC_REVALIDATION_AT.put(player.getUUID(), now + nextPeriodicDelayMillis());
 
-            LOGGER.info("GuardMod sent periodic validation request {} to {}.",
-                    ticket.getRequestId(), player.getGameProfile().getName());
+            if (GuardCommonConfig.LOG_PERIODIC_VALIDATION_REQUESTS.get()) {
+                LOGGER.info("GuardMod sent periodic validation request {} to {}.",
+                        ticket.getRequestId(), player.getGameProfile().getName());
+            }
 
             GuardNetwork.sendEnvironmentRequest(player, ticket.getRequestId(), ticket.getDeadlineEpochMillis());
         }
     }
     private static long nextPeriodicDelayMillis() {
-        long jitter = PERIODIC_REVALIDATION_JITTER_MILLIS <= 0L
-                ? 0L
-                : PERIODIC_REVALIDATION_RANDOM.nextInt((int) PERIODIC_REVALIDATION_JITTER_MILLIS + 1);
+        long baseMillis = GuardCommonConfig.PERIODIC_DYNAMIC_CHECK_BASE_SECONDS.get().longValue() * 1000L;
+        long jitterMaxMillis = GuardCommonConfig.PERIODIC_DYNAMIC_CHECK_JITTER_SECONDS.get().longValue() * 1000L;
 
-        return PERIODIC_REVALIDATION_BASE_INTERVAL_MILLIS + jitter;
+        long jitter = jitterMaxMillis <= 0L
+                ? 0L
+                : (long) PERIODIC_REVALIDATION_RANDOM.nextInt((int) jitterMaxMillis + 1);
+
+        return baseMillis + jitter;
     }
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer) {
             ServerPlayer player = (ServerPlayer) event.getEntity();
             ValidationStateRegistry.clear(player);
+            ValidationRequestModeRegistry.clear(player);
             ClientEnvironmentReportCache.remove(player);
             NEXT_PERIODIC_REVALIDATION_AT.remove(player.getUUID());
         }

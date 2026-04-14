@@ -9,6 +9,7 @@ import com.guardmod.model.ClientShaderPackEntry;
 import net.minecraft.network.chat.Component;
 import com.guardmod.model.ClientResourcePackEntry;
 import net.minecraft.server.level.ServerPlayer;
+import com.guardmod.validate.ValidationRequestModeRegistry;
 import org.slf4j.Logger;
 import java.util.List;
 
@@ -24,6 +25,9 @@ public final class ClientEnvironmentValidator {
         }
 
         boolean reactiveRevalidation = packet.getRequestId() == 0L;
+        ValidationRequestModeRegistry.RequestMode requestMode = reactiveRevalidation
+                ? ValidationRequestModeRegistry.RequestMode.DYNAMIC_ASSETS
+                : ValidationRequestModeRegistry.getMode(player);
 
         if (!reactiveRevalidation && !ValidationStateRegistry.isRequestExpected(player, packet.getRequestId())) {
             LOGGER.warn("GuardMod rejected validation response from {} because requestId {} was not expected.",
@@ -57,17 +61,19 @@ public final class ClientEnvironmentValidator {
             disconnect(player, "Protocol version mismatch");
             return;
         }
-        ValidationResult modResult = ModRulesValidator.validateBootstrapRules(report);
-        if (!modResult.isSuccess()) {
-            if (!reactiveRevalidation) {
-                ValidationStateRegistry.clear(player);
+        if (requestMode == ValidationRequestModeRegistry.RequestMode.FULL) {
+            ValidationResult modResult = ModRulesValidator.validateBootstrapRules(report);
+            if (!modResult.isSuccess()) {
+                if (!reactiveRevalidation) {
+                    ValidationStateRegistry.clear(player);
+                }
+                LOGGER.warn("GuardMod validation failed for {} at stage {}: {}",
+                        player.getGameProfile().getName(),
+                        modResult.getFailedStage(),
+                        modResult.getReason());
+                disconnect(player, modResult.getReason());
+                return;
             }
-            LOGGER.warn("GuardMod validation failed for {} at stage {}: {}",
-                    player.getGameProfile().getName(),
-                    modResult.getFailedStage(),
-                    modResult.getReason());
-            disconnect(player, modResult.getReason());
-            return;
         }
 
         ValidationResult resourcePackResult = ResourcePackRulesValidator.validateActiveResourcePacks(report);
@@ -135,6 +141,14 @@ public final class ClientEnvironmentValidator {
                     report.getShaderRuntime(),
                     report.getActiveShaderPack() == null ? "(none)" : report.getActiveShaderPack().getDisplayName(),
                     report.getInstalledShaderPacks().size());
+        } else if (requestMode == ValidationRequestModeRegistry.RequestMode.DYNAMIC_ASSETS) {
+            if (GuardCommonConfig.LOG_PERIODIC_VALIDATION_PASSES.get()) {
+                LOGGER.info("GuardMod periodic dynamic validation passed for {}. Active resource packs: {}, shader runtime: {}, active shader pack: {}",
+                        player.getGameProfile().getName(),
+                        report.getActiveResourcePacks().size(),
+                        report.getShaderRuntime(),
+                        report.getActiveShaderPack() == null ? "(none)" : report.getActiveShaderPack().getDisplayName());
+            }
         } else {
             LOGGER.info("GuardMod validation passed for {}. Reported client mods: {}, active resource packs: {}, installed external resource packs: {}, shader runtime: {}, active shader pack: {}, installed shader packs: {}",
                     player.getGameProfile().getName(),
